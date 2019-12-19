@@ -1,5 +1,9 @@
 ***********************************
-## CHANGES IN VERSION 1.0.0dev
+## CHANGES IN VERSION 1.1.0
+
+
+***********************************
+## CHANGES IN VERSION 1.0.0
 
 NEW FEATURES
 
