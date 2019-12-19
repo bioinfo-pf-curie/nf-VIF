@@ -1,5 +1,5 @@
 ***********************************
-## CHANGES IN VERSION 1.0.0dev
+## CHANGES IN VERSION 1.0.0
 
 NEW FEATURES
 
@@ -18,7 +18,6 @@ NEW FEATURES
   o Add Bowtie2 (global and local) mapping on HPV strains
 
   o First Nextflow version which implements the analysis strategy for HPV analysis from S. Lameiras et al.
-
 
 BUG FIXES
 
