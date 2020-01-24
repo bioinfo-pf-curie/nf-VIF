@@ -32,8 +32,15 @@ def isSoftClipped(read):
     pattern = re.compile('(\w+)S')
     if pattern.match(read.cigarstring):
         return True
+        
     else:
         return False
+
+def ReverseComplement(Pattern):
+
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
+    reverse_complement = "".join(complement.get(base, base) for base in reversed(Pattern))
+    return reverse_complement
 
 
 def getSoftClippedCoord(read, annot=False):
@@ -62,7 +69,6 @@ def getSoftClippedCoord(read, annot=False):
                 idx += cigarLength
         except:
             print >> sys.stderr, "Error in CIGAR parsing for read", read.name;
-
     return (pos, label)
     
 
@@ -114,7 +120,6 @@ def getClippedSeq(read, coords, revert=False):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("filename")
     parser.add_argument("-l", "--minLen", help="Minimum length of trimmed sequence", default=25)
@@ -138,11 +143,12 @@ if __name__ == "__main__":
 
     baseReadsFile = os.path.basename(args.filename)
     baseReadsFile = re.sub(r'\.bam$|\.sam$', '', baseReadsFile)
+    ReadsFileforgenotype = re.sub(r'\.bam$|\.sam$|\.R', '', baseReadsFile)
     print '## base reads file=', baseReadsFile
-    genotype = re.search(r'^\w+-(.*)$', baseReadsFile, re.M)
+    genotype = re.search(r'^\w+-(.*)$', ReadsFileforgenotype, re.M)
     print '## genotype=', genotype.group(1)
     cur_geno = genotype.group(1)
- 
+
     # Open handlers for output files
     faHandler = open(args.outputDir + '/' + baseReadsFile + '.fa', 'w')
 
@@ -150,16 +156,18 @@ if __name__ == "__main__":
         if args.stranded:
             outHandler3 = open(args.outputDir + '/' + baseReadsFile + '_3prime_bkp.bed', 'w')
             outHandler5 = open(args.outputDir + '/' + baseReadsFile + '_5prime_bkp.bed', 'w')
+            BPHandler = open(args.outputDir + '/' + baseReadsFile + '_BP.bed', 'w')
         else:
             outHandler = open(args.outputDir + '/' + baseReadsFile + '_bkp.bed', 'w')
     elif args.mqc:
         if args.stranded:
             outHandler3 = open(args.outputDir + '/' + baseReadsFile + '_3prime_bkp.mqc', 'w')
             outHandler5 = open(args.outputDir + '/' + baseReadsFile + '_5prime_bkp.mqc', 'w')
+            BPHandler = open(args.outputDir + '/' + baseReadsFile + '_BP.bed', 'w')
         else:
             outHandler = open(args.outputDir + '/' + baseReadsFile + '_bkp.mqc', 'w')
-    
-    # Read the SAM/BAM file
+
+     # Read the SAM/BAM file
     if args.verbose:
         print "## Opening SAM/BAM file '", args.filename, "'..."
     samfile = pysam.Samfile(args.filename, "rb")
@@ -168,22 +176,52 @@ if __name__ == "__main__":
     # Loop on all reads
     readsCounter=0
     bkpPos = {}
-
+    BPHandler.write("Read_Name" + "\t" + "Sequence" + "\t" + "CigarString" + "\t" + "Label" + "\t" + "SoftClip_Position" + "\t" + "BraekPoint_Position" + "\n")  
+ 
     for read in samfile.fetch(until_eof=True):
         readsCounter =+ 1
-        #print read.query_name
-        #print read.cigarstring
         #if isSoftClipped(read):
         #    print "SC"
         #else:
         #    print "False"
-        
         ## /!\ Note that here, we do not take care of read pairs
+
         if isSoftClipped(read):
-        
             (clippedCoord, clippedAnnot) = getSoftClippedCoord(read, annot=args.stranded)
+            for i in range(len(clippedCoord)):
+                s = clippedCoord[i]
+                label = clippedAnnot[i]
+                if label == '3prime' and args.stranded:
+                   BP = clippedCoord[i][0]+1
+                elif label == '5prime' and args.stranded:
+                   BP = clippedCoord[i][1]+1
+                ##pos=[((BP-16),(BP+14))] ## 30 pb
+                pos=[((BP-21),(BP+19))] ## 40 pb
+                #pos=[((BP-11),(BP+9))] ## 20 pb
+                clippedSeq_BP = getClippedSeq(read, pos)
+                if len(clippedSeq_BP) > 0 and pos[0][1] < len(read.seq):
+                   if len(clippedSeq_BP[0]) > 0 :
+                      if label == '5prime' and args.stranded:
+                         RevCom = ReverseComplement(clippedSeq_BP[0])
+                         BPHandler.write(read.query_name+ "\t" + RevCom + "\t" + read.cigarstring + "\t" + label + "\t" + str(s) + "\t" + str(pos[0]) + "\n")
+                      elif label == '3prime' and args.stranded: 
+                         BPHandler.write(read.query_name+ "\t" + clippedSeq_BP[0] + "\t" + read.cigarstring + "\t" + label + "\t" + str(s) + "\t" + str(pos[0]) + "\n")
+
             clippedSeq = getClippedSeq(read, clippedCoord)
-            coordRef = getGenomicBkp(read, excludeBorders=True, reflen=samfile.get_reference_length(samfile.get_reference_name(read.tid)))
+            for i in range(len(clippedSeq)):
+                s = clippedSeq[i]
+                label = clippedAnnot[i]
+                if len(s) > int(args.minLen):
+                    if label == '3prime' and args.stranded:
+                        faHandler.write(">" + read.query_name + "|" + str(cur_geno) + "|right|" + str(read.reference_end) + "\n")
+                        faHandler.write(s + "\n")
+                    elif label == '5prime' and args.stranded:
+                        faHandler.write(">" + read.query_name + "|" + str(cur_geno) + "|left|" + str(read.reference_start+1) +"\n")
+                        faHandler.write(s + "\n")
+                    else:
+                        faHandler.write(">" + read.query_name + "\n")
+                        faHandler.write(s + "\n")
+ 
             ## Export in fasta format
             for i in range(len(clippedSeq)):
                 s = clippedSeq[i]
@@ -199,16 +237,15 @@ if __name__ == "__main__":
                         faHandler.write(">" + read.query_name + "\n")
                         faHandler.write(s + "\n")
 
+
+            coordRef = getGenomicBkp(read, excludeBorders=True, reflen=samfile.get_reference_length(samfile.get_reference_name(read.tid)))
             if args.bed or args.mqc:
-            
                 if coordRef is not None:
                     for i in range(len(coordRef)):
                         coord = coordRef[i]
                         label = clippedAnnot[i]
-
                         if label not in bkpPos:
                             bkpPos[label] = {}
-                        
                         if read.reference_name in bkpPos[label] :
                             if coord in  bkpPos[label][read.reference_name]:
                                 bkpPos[label][read.reference_name][coord] += 1
@@ -220,8 +257,8 @@ if __name__ == "__main__":
 
     
         if (readsCounter % 100000 == 0 and args.verbose):
-            print "##", readsCounter
-            
+           print "##", readsCounter
+   
     ## Export BED file of breakpoints position
     if args.bed or args.mqc:
         for lab in bkpPos:
@@ -243,9 +280,9 @@ if __name__ == "__main__":
                             outHandler.write(str(pos) + "\t" + str(bkpPos[chr][pos]) + "\n")
     
     # Close handler
+    BPHandler.close()
     samfile.close()
     faHandler.close()
-
     if args.bed or args.mqc:
         if args.stranded:
             outHandler3.close()

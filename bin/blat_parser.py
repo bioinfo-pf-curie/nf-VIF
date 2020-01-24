@@ -177,11 +177,11 @@ try:
     table_to_display.to_csv(table, index=False, float_format='%.0f')
 
     # filter table to reduce noise
-    table_to_display = table_to_display[
-        (table_to_display['score'] >= 4)
-        & (table_to_display['match'] >= 10)
-        & (table_to_display['counts'] >= 2)
-    ]    
+    #table_to_display = table_to_display[
+    #    (table_to_display['score'] >= 4)
+    #    & (table_to_display['match'] >= 10)
+    #    & (table_to_display['counts'] >= 2)
+    #]    
 
     table_to_display.sort_values(by=['score', 'counts'], ascending=False, inplace=True)
 
