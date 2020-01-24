@@ -160,7 +160,7 @@ else if(params.readPaths){
 
 if (params.samplePlan){
   ch_splan = Channel.fromPath(params.samplePlan)
-}else{
+}else if(params.readPaths){
   if (params.singleEnd){
     Channel
        .from(params.readPaths)
@@ -176,6 +176,22 @@ if (params.samplePlan){
         }
        .set{ ch_splan }
   }
+}else{
+  if (params.singleEnd){
+    Channel
+       .fromFilePairs( params.reads, size: 1 )
+       .collectFile() {
+          item -> ["sample_plan.csv", item[0] + ',' + item[0] + ',' + item[1][0] + '\n']
+       }     
+       .set { ch_splan }
+  }else{
+    Channel
+       .fromFilePairs( params.reads, size: 2 )
+       .collectFile() {
+          item -> ["sample_plan.csv", item[0] + ',' + item[0] + ',' + item[1][0] + ',' + item[1][1] + '\n']
+       }     
+       .set { ch_splan }
+   }
 }
 
 /*
