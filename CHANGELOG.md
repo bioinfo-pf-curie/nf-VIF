@@ -1,6 +1,9 @@
 ***********************************
 ## CHANGES IN VERSION 1.1.0
 
+BUG FIXES
+
+   o Fix a major bug in nf channels
 
 ***********************************
 ## CHANGES IN VERSION 1.0.0
