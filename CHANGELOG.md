@@ -26,7 +26,6 @@ NEW FEATURES
 
   o First Nextflow version which implements the analysis strategy for HPV analysis from S. Lameiras et al.
 
-
 BUG FIXES
 
   o Fix bug when HPV ref is provided in command line (#12)
