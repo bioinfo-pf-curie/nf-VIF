@@ -64,6 +64,7 @@ def helpMessage() {
       --skip_multiqc                Skip report
       --outdir                      The output directory where the results will be saved
       --email                       Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits
+      --blat_extract_hits           Set this parameter to characterise the difference hits after blat
       -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
 
     """.stripIndent()
@@ -322,7 +323,7 @@ if ( !params.bwt2_index && params.fasta ){
 
 if ( (!params.bwt2_index_hpv | !params.bwt2_index_hpv_split) && params.fasta_hpv ){
 
-  process makeBowtie2IndexHPV {
+process makeBowtie2IndexHPV {
      publishDir path: { params.saveReference ? "${params.outdir}/references" : params.outdir },
               saveAs: { params.saveReference ? it : null }, mode: 'copy'
    
@@ -349,7 +350,7 @@ if ( (!params.bwt2_index_hpv | !params.bwt2_index_hpv_split) && params.fasta_hpv
        bowtie2-build "\${ff}" bowtie2_index_hpv_split/"\${base}"
      done < listoffasta.txt
      """
-  }
+}
 }
 
 
@@ -685,6 +686,7 @@ process extractBreakpointsSequence {
 
    output:
    set val(prefix), file("*.mqc") into bkp_pos mode 'flatten'
+   set val(prefix), file("*.csv") into bkp_seq
    set val(prefix), file("*.fa") into clipped_seq
 
    script:
@@ -692,9 +694,7 @@ process extractBreakpointsSequence {
    """
    extractSoftclipped.py -v --mqc --stranded --minLen 25 ${bam}
    sort -k1,1n ${pfix}_3prime_bkp.mqc | awk 'BEGIN{nr=1} nr<\$1{for (i=nr;i<\$1;i++){print i"\t"0} nr=\$1}{print; nr+=1}' > file1.tmp
-   mv file1.tmp ${pfix}_3prime_bkp.mqc
    sort -k1,1n ${pfix}_5prime_bkp.mqc | awk 'BEGIN{nr=1} nr<\$1{for (i=nr;i<\$1;i++){print i"\t"0} nr=\$1}{print; nr+=1}' > file2.tmp
-   mv file2.tmp ${pfix}_5prime_bkp.mqc
    """
 }
 
@@ -722,12 +722,12 @@ if (!params.skip_blat){
       blat ${blatdb} ${fasta} ${pfix}.tsv -noHead -minScore=25 -minIdentity=90
       """
    }
-
+   
    process blatSummary {
       publishDir "${params.outdir}/hpv_mapping/blat", mode: 'copy'
 
       input:
-      set val(prefix), file(psl) from blat_res
+      set val(prefix), file(psl), file(csv) from blat_res.join(bkp_seq)
  
       output:
       set val(prefix), file("*_table_filtered.csv") into ttd
@@ -735,10 +735,17 @@ if (!params.skip_blat){
 
       script:
       pfix= psl.toString() - ~/(.tsv)?$/
+      if (params.blat_extract_hits) {
+      """
+      extract_hits.py -f ${psl} -b ${csv}
+      """
+      }else{
       """
       blat_parser.py ${psl}
-      """
+      """       
+      }
    }
+   
 }else{
    ttd = Channel.from(false)
 }
@@ -746,7 +753,7 @@ if (!params.skip_blat){
 
 /*
 /* MultiQC
- */
+*/
 
 
 process get_software_versions {
@@ -912,3 +919,5 @@ if (params.split_report){
      """
    }
 }
+
+
