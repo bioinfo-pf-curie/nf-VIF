@@ -47,7 +47,7 @@ custom_data:
             title: 'Aligned reads on HPV genome(s)'
             id: 'hpvlocstats'
             scale: 'RdYlBu'
-            format: '{:,.2f}'
+            format: '{:.0f}'
             save_file: true
 
     table_filtered:
@@ -74,18 +74,18 @@ custom_data:
               format: '{:.0f}'
               placement: 2000
             feature:
-              title: 'Feature'
+              title: 'HPV Orientation'
               description: '5/3 end of reads'
               scale: false
               format: '{:.0f}'
-              placement: 3000
+              placement: 4000
             score:
               title: 'Score'
               min: 0
               max: 10
               scale: 'YlOrBr'
               format: '{:.0f}'
-              placement: 4000
+              placement: 3000
             position:
               title: 'HPV Position'
               scale: false
@@ -97,20 +97,32 @@ custom_data:
               format: '{:.0f}'
               placement: 6000
             chr_position:
-              title: 'Position'
+              title: 'Breakpoint'
               scale: false
               format: '{:.0f}'
               placement: 7000
-            match:
-              title: 'Match'
+            end:
+              title: 'Reads Ends'
+              description: Median reads end positions
               scale: false
               format: '{:.0f}'
               placement: 8000
+            strand:
+              title: 'Orientation'
+              scale: false
+              placement: 9000
+            match:
+              title: 'Match'
+              description: 'Number of matching bases that are not repeats'
+              scale: false
+              format: '{:.0f}'
+              placement: 10000
             counts:
               title: 'Counts'
+              description: 'Number of reads supporting the event'
               scale: 'YlOrBr'
               format: '{:.0f}'
-              placement: 9000
+              placement: 11000
 
 sp:
    ctrl_stats:

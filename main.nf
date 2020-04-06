@@ -31,15 +31,14 @@ def helpMessage() {
 
     Usage:
 
-    nextflow run main.nf --reads '*_R{1,2}.fastq.gz' --genome 'hg19' -profile curie
-    nextflow run main.nf --samplePlan sample_plan --genome hg19 -profile curie
+    nextflow run main.nf --reads '*_R{1,2}.fastq.gz' --genome 'hg19' -profile conda
+    nextflow run main.nf --samplePlan sample_plan --genome hg19 -profile conda
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes)
       --samplePlan                  Path to sample plan file if '--reads' is not specified
       --genome                      Name of iGenomes reference
-      -profile                      Configuration profile to use. Can use multiple (comma separated)
-                                    Available: conda, singularityPath, cluster, test and more.
+      -profile                      Configuration profile to use. test / conda / toolsPath / singularity / cluster (see below)
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
@@ -57,14 +56,24 @@ def helpMessage() {
 
     Other options:
       --nb_geno                     Number of HPV genotype to consider
+      --outdir                      The output directory where the results will be saved
+      --email                       Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits
+      -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
+
+     Skip options:
       --split_report                Generate one report per sample
       --skip_trimming               Skip trimming step
       --skip_fastqc                 Skip quality controls on sequencing reads
       --skip_blat                   Skip Human mapping with Blat
       --skip_multiqc                Skip report
-      --outdir                      The output directory where the results will be saved
-      --email                       Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits
-      -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
+
+    =======================================================                                                                                                                                                 
+    Available Profiles
+      -profile test                Set up the test dataset
+      -profile conda               Build a new conda environment before running the pipeline
+      -profile toolsPath           Use the paths defined in configuration for each tool
+      -profile singularity         Use the Singularity images for each process
+      -profile cluster             Run the workflow on the cluster, instead of locally
 
     """.stripIndent()
 }
@@ -122,13 +131,13 @@ if(params.samplePlan){
       Channel
          .from(file("${params.samplePlan}"))
          .splitCsv(header: false)
-         .map{ row -> [ row[1], [file(row[2])]] }
+         .map{ row -> [ row[0], [file(row[2])]] }
          .set {reads_trimgalore}
    }else{
       Channel
          .from(file("${params.samplePlan}"))
          .splitCsv(header: false)
-         .map{ row -> [ row[1], [file(row[2]), file(row[3])]] }
+         .map{ row -> [ row[0], [file(row[2]), file(row[3])]] }
          .set {reads_trimgalore}
    }
    params.reads=false
@@ -618,7 +627,7 @@ process HPVlocalMapping {
           --local --very-sensitive-local --no-unal \\
           -p ${task.cpus} \\
           -x ${index}/${hpv} \\
-          -U ${reads} > ${prefix}-${hpv}.bam
+          -U ${reads} > ${prefix}-${hpv}.bam 2> ${prefix}-${hpv}_bowtie2.log
   samtools sort -@  ${task.cpus} -o ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
   mv ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
   """
@@ -628,7 +637,7 @@ process HPVlocalMapping {
           --local --very-sensitive-local --no-unal \\
           -p ${task.cpus} \\
           -x ${index}/${hpv} \\
-          -1 ${reads[0]} -2 ${reads[1]} > ${prefix}-${hpv}.bam
+          -1 ${reads[0]} -2 ${reads[1]} > ${prefix}-${hpv}.bam 2> ${prefix}-${hpv}_bowtie2.log
   samtools sort -@  ${task.cpus} -o ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
   mv ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
   """
@@ -648,8 +657,9 @@ process HPVlocalMappingStats {
   pfix= bam.toString() - ~/(.bam)?$/
   """
   genomeCoverageBed -d -ibam ${bam} > ${pfix}_coverage.out
-  echo -e "ID,sample,HPVsubtype,minCov,maxCov,meanCov" > ${pfix}_coverage.stats
-  awk -v id=${prefix} 'NR==1{hpv=\$1;mn=mx=\$3}{total+=\$3}(\$3>mx){mx=\$3}(\$3<mn){mn=\$3} END{OFS=","; print id"_"hpv,id,hpv,mn,mx,total/NR}' ${pfix}_coverage.out >> ${pfix}_coverage.stats
+  nbaln=\$(samtools flagstat ${bam} | grep 'mapped (' | awk '{print \$1}')
+  echo -e "ID,sample,HPVsubtype,mappedReads,minCov,maxCov,meanCov" > ${pfix}_coverage.stats
+  awk -v id=${prefix} -v nbaln=\$nbaln 'NR==1{hpv=\$1;mn=mx=\$3}{total+=\$3}(\$3>mx){mx=\$3}(\$3<mn){mn=\$3} END{OFS=","; print id"_"hpv,id,hpv,nbaln,mn,mx,total/NR}' ${pfix}_coverage.out >> ${pfix}_coverage.stats
   """
 }
 
@@ -690,7 +700,7 @@ process extractBreakpointsSequence {
    script:
    pfix= bam.toString() - ~/.bam$/
    """
-   extractSoftclipped.py -v --mqc --stranded --minLen 25 ${bam}
+   extractSoftclipped.py -v --mqc --stranded --minLen 10 ${bam}
    sort -k1,1n ${pfix}_3prime_bkp.mqc | awk 'BEGIN{nr=1} nr<\$1{for (i=nr;i<\$1;i++){print i"\t"0} nr=\$1}{print; nr+=1}' > file1.tmp
    mv file1.tmp ${pfix}_3prime_bkp.mqc
    sort -k1,1n ${pfix}_5prime_bkp.mqc | awk 'BEGIN{nr=1} nr<\$1{for (i=nr;i<\$1;i++){print i"\t"0} nr=\$1}{print; nr+=1}' > file2.tmp
@@ -892,7 +902,7 @@ if (params.split_report){
      file ('hpv/*') from hpv_cov_stats.map{items->items[1]}.collect()
      file ('hpv/*') from hpv_bw_cov.map{items->items[1]}.collect()
      file ('hpv/*') from bkp_pos.map{items->items[1]}.collect()
-     file ('hpv/*') from mqc_genepos.map{items->items[1]}.collect()
+     file ('hpv/*') from mqc_genepos.collect()
      file ('hpv/*') from ttd.collect().ifEmpty([])
      file ('ctrl/*') from ctrl_stats.collect()
   
@@ -907,8 +917,11 @@ if (params.split_report){
      script:
      rtitle = custom_runName ? "--title \"$custom_runName\"" : ''
      rfilename = custom_runName ? "--filename " + custom_runName.replaceAll('\\W','_').replaceAll('_+','_') + "_multiqc_report" : ''
+     metadata_opts = params.metadata ? "--metadata ${metadata}" : ""
+     splan_opts = params.samplePlan ? "--splan ${params.samplePlan}" : ""
      """	
-     multiqc . -f $rtitle $rfilename -c $multiqc_config -c $hpv_config -m fastqc -m custom_content
+     mqc_header.py --name "nv-VIF" --version ${workflow.manifest.version} ${metadata_opts} ${splan_opts} > multiqc-config-header.yaml         
+     multiqc . -f $rtitle $rfilename -c $multiqc_config -c $hpv_config -c multiqc-config-header.yaml -m fastqc -m custom_content
      """
    }
 }

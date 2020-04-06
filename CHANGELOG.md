@@ -1,6 +1,14 @@
 ***********************************
 ## CHANGES IN VERSION 1.0.1
 
+SIGNIFICANT USER-VISIBLE CHANGES
+
+   o Add BLAT Strand orientation in summary table
+
+   o Change minLen parameter to 10 for extractSoftclipped.py
+
+   o Filter clipped reads based on minLen parameter before breakpoint frequency calculation
+
 BUG FIXES
 
    o Fix a major bug in nf channels

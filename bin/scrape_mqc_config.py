@@ -34,7 +34,7 @@ if __name__ == "__main__":
          title: '[{genotype}] Alignment Coverage'
          id: 'hpvcov_{genotype}'
          xlab: '{genotype} genomic sequence'
-         ylab: 'reads coverage (CPM)'
+         ylab: 'Normalized Reads Coverage (CPM)'
     '''
 
     config_bkp='''\
