@@ -1,4 +1,14 @@
 ***********************************
+## CHANGES IN VERSION 1.1.0
+
+TODO:
+- replace CPM by reads number
+- counts = utiliser tous les reads ?
+- change median by max sequence
+
+
+
+***********************************
 ## CHANGES IN VERSION 1.0.1
 
 SIGNIFICANT USER-VISIBLE CHANGES

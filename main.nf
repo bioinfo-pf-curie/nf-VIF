@@ -476,8 +476,9 @@ process HPVmapping {
           -p ${task.cpus} \\
           -x ${index}/${hpv_bwt2_base} \\
           -U ${reads} > ${prefix}_hpvs.bam
-  samtools sort -@  ${task.cpus} -o ${prefix}_sorted.bam ${prefix}_hpvs.bam
-  mv ${prefix}_sorted.bam ${prefix}_hpvs.bam
+  samtools view -h -q 20 ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
+  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_hpvs_filt.bam
+  mv ${prefix}_fsorted.bam ${prefix}_hpvs.bam
   """
   }else{
   """
@@ -486,8 +487,9 @@ process HPVmapping {
           -p ${task.cpus} \\
           -x ${index}/${hpv_bwt2_base} \\
           -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_hpvs.bam
-  samtools sort -@  ${task.cpus} -o ${prefix}_sorted.bam ${prefix}_hpvs.bam
-  mv ${prefix}_sorted.bam ${prefix}_hpvs.bam
+  samtools view -h -q 20 ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
+  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_hpvs_filt.bam
+  mv ${prefix}_fsorted.bam ${prefix}_hpvs.bam
   """
   }
 }
@@ -515,8 +517,9 @@ process ctrlMapping {
           -p ${task.cpus} \\
           -x ${index}/ctrl_regions \\
           -U ${reads} > ${prefix}_ctrl.bam
-  samtools sort -@  ${task.cpus} -o ${prefix}_sorted.bam ${prefix}_ctrl.bam
-  mv ${prefix}_sorted.bam ${prefix}_ctrl.bam
+  samtools view -h -q 20 ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam
+  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_ctrl_filt.bam
+  mv ${prefix}_fsorted.bam ${prefix}_ctrl.bam
   """
   }else{
   """
@@ -525,8 +528,9 @@ process ctrlMapping {
           -p ${task.cpus} \\
           -x ${index}/ctrl_regions \\
           -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_ctrl.bam
-  samtools sort -@  ${task.cpus} -o ${prefix}_sorted.bam ${prefix}_ctrl.bam
-  mv ${prefix}_sorted.bam ${prefix}_ctrl.bam
+  samtools view -h -q 20 ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam 
+  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_ctrl_filt.bam
+  mv ${prefix}_fsorted.bam ${prefix}_ctrl.bam
   """
   }
 }
@@ -859,8 +863,11 @@ if (params.split_report){
      script:
      rtitle = custom_runName ? "--title \"$custom_runName\"" : ''
      rfilename = custom_runName ? "--filename " + custom_runName.replaceAll('\\W','_').replaceAll('_+','_') + "_" + prefix + "_multiqc_report" : ''
+     metadata_opts = params.metadata ? "--metadata ${metadata}" : ""
+     splan_opts = params.samplePlan ? "--splan ${params.samplePlan}" : ""
      """	
-     multiqc . -f $rtitle -n ${prefix}_HPVreport.html -c $multiqc_config -c 'mqc/hpv_config.mqc' -m fastqc -m custom_content
+     mqc_header.py --name "nf-VIF" --version ${workflow.manifest.version} ${metadata_opts} ${splan_opts} > multiqc-config-header.yaml
+     multiqc . -f $rtitle -n ${prefix}_HPVreport.html -c $multiqc_config -c 'mqc/hpv_config.mqc' -c multiqc-config-header.yaml -m fastqc -m custom_content
      """
    }
 }else{
@@ -920,7 +927,7 @@ if (params.split_report){
      metadata_opts = params.metadata ? "--metadata ${metadata}" : ""
      splan_opts = params.samplePlan ? "--splan ${params.samplePlan}" : ""
      """	
-     mqc_header.py --name "nv-VIF" --version ${workflow.manifest.version} ${metadata_opts} ${splan_opts} > multiqc-config-header.yaml         
+     mqc_header.py --name "nf-VIF" --version ${workflow.manifest.version} ${metadata_opts} ${splan_opts} > multiqc-config-header.yaml         
      multiqc . -f $rtitle $rfilename -c $multiqc_config -c $hpv_config -c multiqc-config-header.yaml -m fastqc -m custom_content
      """
    }
