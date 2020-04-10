@@ -54,22 +54,30 @@ def helpMessage() {
       --bwt2_index_hpv              Path to Bowtie2 index for all HPV strains
       --bwt2_index_hpv_split        Path to Bowtie2 index per HPV strain
 
-    Other options:
+    Advanced options:
+      --min_mapq                    Minimum reads mapping quality. Default: 0
+      --blat_extract_hits           
       --nb_geno                     Number of HPV genotype to consider
+      --split_report                Generate one report per sample
+ 
+    Other options:
       --outdir                      The output directory where the results will be saved
       --email                       Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits
       -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
 
      Skip options:
-      --split_report                Generate one report per sample
       --skip_trimming               Skip trimming step
       --skip_fastqc                 Skip quality controls on sequencing reads
       --skip_blat                   Skip Human mapping with Blat
       --skip_multiqc                Skip report
-      --outdir                      The output directory where the results will be saved
-      --email                       Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits
-      --blat_extract_hits           Set this parameter to characterise the difference hits after blat
-      -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
+
+    =======================================================                                                                                                                                                 
+    Available Profiles
+      -profile test                Set up the test dataset
+      -profile conda               Build a new conda environment before running the pipeline
+      -profile toolsPath           Use the paths defined in configuration for each tool
+      -profile singularity         Use the Singularity images for each process
+      -profile cluster             Run the workflow on the cluster, instead of locally
 
     """.stripIndent()
 }
@@ -472,7 +480,7 @@ process HPVmapping {
           -p ${task.cpus} \\
           -x ${index}/${hpv_bwt2_base} \\
           -U ${reads} > ${prefix}_hpvs.bam
-  samtools view -h -q 20 ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
+  samtools view -h -q ${params.min_mapq} ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
   samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_hpvs_filt.bam
   mv ${prefix}_fsorted.bam ${prefix}_hpvs.bam
   """
@@ -483,7 +491,7 @@ process HPVmapping {
           -p ${task.cpus} \\
           -x ${index}/${hpv_bwt2_base} \\
           -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_hpvs.bam
-  samtools view -h -q 20 ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
+  samtools view -h -q ${params.min_mapq} ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
   samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_hpvs_filt.bam
   mv ${prefix}_fsorted.bam ${prefix}_hpvs.bam
   """
@@ -513,7 +521,7 @@ process ctrlMapping {
           -p ${task.cpus} \\
           -x ${index}/ctrl_regions \\
           -U ${reads} > ${prefix}_ctrl.bam
-  samtools view -h -q 20 ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam
+  samtools view -h -q ${params.min_mapq} ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam
   samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_ctrl_filt.bam
   mv ${prefix}_fsorted.bam ${prefix}_ctrl.bam
   """
@@ -524,7 +532,7 @@ process ctrlMapping {
           -p ${task.cpus} \\
           -x ${index}/ctrl_regions \\
           -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_ctrl.bam
-  samtools view -h -q 20 ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam 
+  samtools view -h -q ${params.min_mapq} ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam 
   samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_ctrl_filt.bam
   mv ${prefix}_fsorted.bam ${prefix}_ctrl.bam
   """
@@ -600,7 +608,6 @@ sel_hpv_geno
  */
 
 process HPVlocalMapping {
-
   publishDir "${params.outdir}/hpv_mapping/local", mode: 'copy',
       saveAs: {filename ->
           if (filename.indexOf(".bam") == -1) "logs/$filename"
