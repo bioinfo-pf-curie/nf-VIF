@@ -50,10 +50,11 @@ try:
     case3 = (data['feature'] == 'right') & (data['strand'] == '+')
     case4 = (data['feature'] == 'right') & (data['strand'] == '-')
     vals = [data['Tstart'], data['Tend'], data['Tstart'], data['Tend']]
-    data['chr_position'] = np.select([case1, case2, case3, case4],
-                                     vals, default=np.nan)
+    end_vals = [data['Tend'], data['Tstart'], data['Tend'], data['Tstart']]
+    data['chr_position'] = np.select([case1, case2, case3, case4], vals, default=np.nan)
     data['chr_position'] = data['chr_position'].astype(int)    
-    
+    data['end'] = np.select([case1, case2, case3, case4], end_vals, default=np.nan)
+    data['end'] = data['end'].astype(int)
 
     # Filter rows having 'Qgapbases <= 5 & Tgapbases <= 5 & prop >0.9'
     data_filtered = data.query('Qgapbases <= 5 & Tgapbases <= 5 & prop > 0.9')    
@@ -83,6 +84,23 @@ try:
     ).max()
     data_filtered_renamed = data_filtered_renamed.set_index('match_key')
     data_filtered_renamed.update(max_match_by_key)    
+
+    # Create a key to group ends
+    data_filtered_renamed['ends_key'] = (
+        data_filtered_renamed['strand'] + "|"
+        + data_filtered_renamed['genotype'] + "|"
+        + data_filtered_renamed['feature'] + "|"
+        + data_filtered_renamed['position'].astype(str) + "|"
+        + data_filtered_renamed['chr'] + "|"
+        + data_filtered_renamed['chr_position'].astype(str)
+    )
+    ends_by_key = data_filtered_renamed['end'].groupby(
+        data_filtered_renamed['ends_key']
+    ).median()
+    #.apply(lambda x: "{%s}" % ','.join(np.unique(x)))
+    data_filtered_renamed = data_filtered_renamed.set_index('ends_key')
+    data_filtered_renamed.update(ends_by_key)
+
 
     cleaned = data_filtered_renamed
     cleaned['score'] = 0
@@ -146,7 +164,7 @@ try:
 
     table_to_display = cleaned.loc[:, [
         'sample', 'genotype', 'feature', 'score', 'position', 'chr',
-        'chr_position', 'match'
+        'chr_position', 'end', 'strand', 'match'
     ]]
     # add count column
     table_to_display['counts'] = 0
@@ -193,12 +211,12 @@ try:
 
     table_to_display = table_to_display.reindex(columns=[
         'multiqc_index', 'sample', 'genotype', 'feature', 'score', 'position',
-        'chr', 'chr_position', 'match', 'counts'
+        'chr', 'chr_position', 'end', 'strand', 'match', 'counts'
     ])    
 
     table_to_display.to_csv(table_filtered, index=False, float_format='%.0f')
 
 except:
-    emptydf=pd.DataFrame(columns=['multiqc_index','sample','genotype','feature','score','position','chr','chr_position','match','counts'])
+    emptydf=pd.DataFrame(columns=['multiqc_index','sample','genotype','feature','score','position','chr','chr_position','end','strand','match','counts'])
     emptydf.to_csv(path_or_buf=table_filtered,index=False)
     emptydf.to_csv(path_or_buf=table,index=False)

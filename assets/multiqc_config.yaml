@@ -47,18 +47,18 @@ custom_data:
             title: 'Aligned reads on HPV genome(s)'
             id: 'hpvlocstats'
             scale: 'RdYlBu'
-            format: '{:,.2f}'
+            format: '{:.0f}'
             save_file: true
 
-    table_filtered:
+    insertion_summary:
         file_format: 'csv'
-        section_name: 'Summary'
-        description: ' of detected subtypes.'
+        section_name: 'Insertion Sites'
+        description: ' detected on Human reference genome.'
         plot_type: 'table'
         pconfig:
-            namespace: 'table_filtered'
-            title: 'Summary'
-            id: 'table_filtered'
+            namespace: 'insertion_summary'
+            title: 'Insertion Sites'
+            id: 'insertionsites'
             save_file: true
             no_beeswarm: true
             col1_header: 'IDs'
@@ -74,18 +74,18 @@ custom_data:
               format: '{:.0f}'
               placement: 2000
             feature:
-              title: 'Feature'
+              title: 'HPV Orientation'
               description: '5/3 end of reads'
               scale: false
               format: '{:.0f}'
-              placement: 3000
+              placement: 4000
             score:
               title: 'Score'
               min: 0
               max: 10
               scale: 'YlOrBr'
               format: '{:.0f}'
-              placement: 4000
+              placement: 3000
             position:
               title: 'HPV Position'
               scale: false
@@ -97,20 +97,32 @@ custom_data:
               format: '{:.0f}'
               placement: 6000
             chr_position:
-              title: 'Position'
+              title: 'Breakpoint'
               scale: false
               format: '{:.0f}'
               placement: 7000
-            match:
-              title: 'Match'
+            end:
+              title: 'Reads Ends'
+              description: Median reads end positions
               scale: false
               format: '{:.0f}'
               placement: 8000
+            strand:
+              title: 'Orientation'
+              scale: false
+              placement: 9000
+            match:
+              title: 'Match'
+              description: 'Number of matching bases that are not repeats'
+              scale: false
+              format: '{:.0f}'
+              placement: 10000
             counts:
               title: 'Counts'
+              description: 'Number of reads supporting the event'
               scale: 'YlOrBr'
               format: '{:.0f}'
-              placement: 9000
+              placement: 11000
 
 sp:
    ctrl_stats:
@@ -119,7 +131,7 @@ sp:
       fn: '*genotyping.stats'
    hpv_loc_stats:
       fn: '*coverage.stats'
-   table_filtered:
+   insertion_summary:
       fn: '*table_filtered.csv'
 
 module_order:
@@ -132,6 +144,8 @@ report_section_order:
     order: -200
   hpv_loc_stats:
     order: -300
+  insertion_summary:
+    order: -900
   software_versions:
     order: -1001
   summary:

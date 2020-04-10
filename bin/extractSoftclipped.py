@@ -47,6 +47,8 @@ def ReverseComplement(Pattern):
 def getSoftClippedCoord(read, annot=False):
     """Get the clipped position on the read from the CIGAR string
        annot : if true, distinguish 5'/3' end coordinates
+       5prime = read clipped at the beginning (5' end)
+       3prime = read clipped in the end (3' end)
     """
     idx = 0
     pos = []
@@ -123,7 +125,7 @@ def getClippedSeq(read, coords, revert=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("filename")
-    parser.add_argument("-l", "--minLen", help="Minimum length of trimmed sequence", default=25)
+    parser.add_argument("-l", "--minLen", help="Minimum length of trimmed sequence", default=0)
     parser.add_argument("-b", "--bed", help="Export soft-clipped borders in BED format", action='store_true')
     parser.add_argument("-m", "--mqc", help="Export soft-clipped borders in MultiQC format", action='store_true')
     parser.add_argument("-s", "--stranded", help="Annotate 3' and 5' trimmed sequences and report them in distinct output files", action='store_true')
@@ -181,12 +183,7 @@ if __name__ == "__main__":
  
     for read in samfile.fetch(until_eof=True):
         readsCounter =+ 1
-        #print read.query_name
-        #print read.cigarstring
-        #if isSoftClipped(read):
-        #    print "SC"
-        #else:
-        #    print "False"
+
         ## /!\ Note that here, we do not take care of read pairs
 
         if isSoftClipped(read):
@@ -238,17 +235,20 @@ if __name__ == "__main__":
                     for i in range(len(coordRef)):
                         coord = coordRef[i]
                         label = clippedAnnot[i]
-                        if label not in bkpPos:
-                            bkpPos[label] = {}
-                        if read.reference_name in bkpPos[label] :
-                            if coord in  bkpPos[label][read.reference_name]:
-                                bkpPos[label][read.reference_name][coord] += 1
-                            else:
-                                bkpPos[label][read.reference_name][coord] = 1 
-                        else:
-                            bkpPos[label][read.reference_name] = {}
-                            bkpPos[label][read.reference_name][coord] = 1
+                        s = clippedSeq[i]
 
+                        if len(s) > int(args.minLen):
+                            if label not in bkpPos:
+                                bkpPos[label] = {}
+                        
+                            if read.reference_name in bkpPos[label] :
+                                if coord in  bkpPos[label][read.reference_name]:
+                                    bkpPos[label][read.reference_name][coord] += 1
+                                else:
+                                    bkpPos[label][read.reference_name][coord] = 1 
+                            else:
+                                bkpPos[label][read.reference_name] = {}
+                                bkpPos[label][read.reference_name][coord] = 1
     
         if (readsCounter % 100000 == 0 and args.verbose):
            print "##", readsCounter
