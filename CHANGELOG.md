@@ -4,8 +4,12 @@
 TODO:
 - replace CPM by reads number
 - counts = utiliser tous les reads ?
-- change median by max sequence
-
+- change median by max sequence - OK
+- Peut-on fusionner les codes sur le summary ?
+- Test insertion multiple - in silico ?
+- Test mapQ20 ?
+- Test ref hpv simplifié ?
+- Extraire les séquences de genes et faire un variant calling dessus ?
 
 
 ***********************************

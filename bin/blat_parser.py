@@ -96,7 +96,7 @@ try:
     )
     ends_by_key = data_filtered_renamed['end'].groupby(
         data_filtered_renamed['ends_key']
-    ).median()
+    ).max()
     #.apply(lambda x: "{%s}" % ','.join(np.unique(x)))
     data_filtered_renamed = data_filtered_renamed.set_index('ends_key')
     data_filtered_renamed.update(ends_by_key)

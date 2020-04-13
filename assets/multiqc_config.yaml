@@ -103,7 +103,7 @@ custom_data:
               placement: 7000
             end:
               title: 'Reads Ends'
-              description: Median reads end positions
+              description: Max reads end positions
               scale: false
               format: '{:.0f}'
               placement: 8000
