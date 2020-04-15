@@ -4,13 +4,28 @@
 TODO:
 - replace CPM by reads number
 - counts = utiliser tous les reads ?
-- change median by max sequence - OK
 - Peut-on fusionner les codes sur le summary ?
 - Test insertion multiple - in silico ?
 - Test mapQ20 ?
 - Test ref hpv simplifié ?
 - Extraire les séquences de genes et faire un variant calling dessus ?
+- template
+- mqc report
 
+
+NEW FEATURES
+   
+   o New minMapq option to provide the minimum mapping quality for the mapping steps
+
+   o New --minLen option to provide the minimum length of clipped sequence to consider
+
+   o Update of BLAT summary with flanking info
+   
+   o Manage overlapping R1/R2 reads reporting the same breakpoint
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+   o Report end as max reads position
 
 ***********************************
 ## CHANGES IN VERSION 1.0.1

@@ -38,7 +38,7 @@ def isSoftClipped(read):
         return False
 
 def ReverseComplement(Pattern):
-
+    """Reverse Complement of a sequence"""
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
     reverse_complement = "".join(complement.get(base, base) for base in reversed(Pattern))
     return reverse_complement
@@ -126,15 +126,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("filename")
     parser.add_argument("-l", "--minLen", help="Minimum length of trimmed sequence", default=0)
-    parser.add_argument("-b", "--bed", help="Export soft-clipped borders in BED format", action='store_true')
-    parser.add_argument("-m", "--mqc", help="Export soft-clipped borders in MultiQC format", action='store_true')
+    parser.add_argument("-b", "--bed", help="Export soft-clipped borders coverage in BEDGraph format", action='store_true')
+    parser.add_argument("-m", "--mqc", help="Export soft-clipped borders coverage in MultiQC format", action='store_true')
     parser.add_argument("-s", "--stranded", help="Annotate 3' and 5' trimmed sequences and report them in distinct output files", action='store_true')
     parser.add_argument("-v", "--verbose", help="Verbose mode", action='store_true')
     parser.add_argument("-o", "--outputDir", help="Output directory", default="./")
     args = parser.parse_args()
 
     if args.bed is True and args.mqc is True:
-        print "--bed and --mqc parameters cannot be used together. Please specify only one output format"
+        print "--bed and --mqc parameters cannot be used together. Please specify only one coverage format"
         sys.exit(1)
     
     # Verbose mode
@@ -154,8 +154,8 @@ if __name__ == "__main__":
 
     # Open handlers for output files
     faHandler = open(args.outputDir + '/' + baseReadsFile + '.fa', 'w')
-    BPHandler = open(args.outputDir + '/' + baseReadsFile + '_BP.csv', 'w')
-    BPHandler.write("Read_Name" + "\t" + "Sequence" + "\t" + "Pos_Ref" + "\t" + "CigarString" + "\t" + "Label" + "\t" + "SoftClip_Position" + "\t" + "BraekPoint_Position" + "\t" +  "Breakpoint" + "\t" + "Coordinate_Fasta" +"\t" + "Length_Seq" + "\t" + "Flanking_Seq" + "\n")
+    bkpHandler = open(args.outputDir + '/' + baseReadsFile + '_bkp.csv', 'w')
+    bkpHandler.write("Read_Name" + "\t" + "Sequence" + "\t" + "Pos_Ref" + "\t" + "CigarString" + "\t" + "Label" + "\t" + "SoftClip_Position" + "\t" + "BreakPoint_Position" + "\t" +  "Breakpoint" + "\t" + "Coordinate_Fasta" +"\t" + "Length_Seq" + "\t" + "Flanking_Seq" + "\n")
 
     if args.bed:
         if args.stranded:
@@ -185,35 +185,54 @@ if __name__ == "__main__":
         readsCounter =+ 1
 
         ## /!\ Note that here, we do not take care of read pairs
-
         if isSoftClipped(read):
             (clippedCoord, clippedAnnot) = getSoftClippedCoord(read, annot=args.stranded)
-          
+            clippedSeq = getClippedSeq(read, clippedCoord)
+
             ## Export in csv format 
             for i in range(len(clippedCoord)):
                 s = clippedCoord[i]
                 label = clippedAnnot[i]
-                if label == '3prime' and args.stranded:
-                   BP = clippedCoord[i][0]+1
-                elif label == '5prime' and args.stranded:
-                   BP = clippedCoord[i][1]+1
-                pos=[((BP-21),(BP+19))] ## 40 pb
-                clippedSeq_BP = getClippedSeq(read, pos)
-                if len(clippedSeq_BP) > 0 and pos[0][1] < len(read.seq):
-                   if len(clippedSeq_BP[0]) > 0 :
-                      clippedSeq = getClippedSeq(read, [s])
-                      if label == '5prime' and args.stranded:
-                         RevCom = ReverseComplement(clippedSeq_BP[0])
-                         RevComSeq = ReverseComplement(clippedSeq[0])
-                         BPHandler.write(read.query_name+ "\t" + RevCom + "\t" + str(read.reference_start+1) + "\t" +read.cigarstring + "\t" + label + "\t" + str(s) + "\t" + str(pos[0]) + "\t" + str(s[1])+ "\t" + str(s) + "\t" + str(s[1]) + "\t" + RevComSeq + " \n")
-                      elif label == '3prime' and args.stranded:
-                         BPHandler.write(read.query_name+ "\t" + clippedSeq_BP[0] +  "\t" + str(read.reference_end) + "\t" + read.cigarstring + "\t" + label + "\t" + str(s) + "\t" + str(pos[0]) + "\t" + str(s[0]) + "\t" + str(((s[0]),(len(read.seq)))) + "\t" + str(len(read.seq)-s[0]) + "\t" + clippedSeq[0] + "\n")
-            
-            ## end 
+                cseq = clippedSeq[i]
 
-            clippedSeq = getClippedSeq(read, clippedCoord)
+                if len(cseq) > int(args.minLen):
+                    if label == '3prime' and args.stranded:
+                        bkpStart = clippedCoord[i][0]+1
+                    elif label == '5prime' and args.stranded:
+                        bkpStart = clippedCoord[i][1]+1
+                    else:
+                        if clippedCoord[i][0]==0:
+                            bkpStart = clippedCoord[i][1]+1
+                        else:
+                            bkpStart = clippedCoord[i][0]+1
+
+                    ## Get bkp motif
+                    mStart =  bkpStart - (int(args.minLen) + 1)
+                    mEnd = bkpStart + (int(args.minLen) - 1)
+                    if mStart < 0:
+                        mStart = 0
+                    if mEnd >= len(read.seq):
+                        mEnd = len(read.seq)
+                    pos=[(mStart,mEnd)] ## 40 pb
+                    bkpMotif = getClippedSeq(read, pos)
+                    #if len(bkpMotif) > 0 and pos[0][1] < len(read.seq):
+                    #    if len(bkpMotif[0]) > 0 :
+                    #clippedSeq = getClippedSeq(read, [s])
+                    if label == '5prime' and args.stranded:
+                        RevCom = ReverseComplement(bkpMotif[0])
+                        RevComSeq = ReverseComplement(cseq)
+                        bkpHandler.write(read.query_name+ "\t" + RevCom + "\t" + str(read.reference_start+1) 
+                                         + "\t" +read.cigarstring + "\t" + label + "\t" + str(s) + "\t" 
+                                         + str(pos[0]) + "\t" + str(s[1])+ "\t" + str(s) + "\t" + str(s[1]) 
+                                         + "\t" + RevComSeq + " \n")
+                    elif (label == '3prime' and args.stranded) or not args.stranded:
+                        bkpHandler.write(read.query_name+ "\t" + bkpMotif[0] +  "\t" + str(read.reference_end) 
+                                         + "\t" + read.cigarstring + "\t" + label + "\t" + str(s) + "\t" 
+                                         + str(pos[0]) + "\t" + str(s[0]) + "\t" + str(((s[0]),(len(read.seq)))) + "\t" 
+                                         + str(len(read.seq)-s[0]) + "\t" + cseq + "\n")
 
             ## Export in fasta format
+            ##clippedSeq = getClippedSeq(read, clippedCoord) 
             for i in range(len(clippedSeq)):
                 s = clippedSeq[i]
                 label = clippedAnnot[i]
@@ -274,7 +293,7 @@ if __name__ == "__main__":
                             outHandler.write(str(pos) + "\t" + str(bkpPos[chr][pos]) + "\n")
     
     # Close handler
-    BPHandler.close()
+    bkpHandler.close()
     samfile.close()
     faHandler.close()
  

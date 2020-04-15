@@ -56,6 +56,7 @@ def helpMessage() {
 
     Advanced options:
       --min_mapq                    Minimum reads mapping quality. Default: 0
+      --minLen                      Minimum trimmed length sequence to consider. Default: 10
       --blat_extract_hits           
       --nb_geno                     Number of HPV genotype to consider
       --split_report                Generate one report per sample
@@ -460,7 +461,7 @@ process fastqc {
 
 process HPVmapping {
   tag "$prefix"
-  publishDir "${params.outdir}/hpv_mapping/global", mode: 'copy',
+  publishDir "${params.outdir}/hpv_mapping/allref", mode: 'copy',
         saveAs: {filename ->
             if (filename.indexOf(".bam") == -1) "logs/$filename"
             else filename}
@@ -561,7 +562,7 @@ process ctrlStats {
  */
 
 process selectGenotypes{
-  publishDir "${params.outdir}/hpv_mapping/global", mode: 'copy'
+  publishDir "${params.outdir}/hpv_mapping/allref", mode: 'copy'
 
   input:
   set val(prefix), file(bam) from hpv_bam 
@@ -608,7 +609,7 @@ sel_hpv_geno
  */
 
 process HPVlocalMapping {
-  publishDir "${params.outdir}/hpv_mapping/local", mode: 'copy',
+  publishDir "${params.outdir}/hpv_mapping/pergenotype", mode: 'copy',
       saveAs: {filename ->
           if (filename.indexOf(".bam") == -1) "logs/$filename"
           else filename}
@@ -652,7 +653,7 @@ process HPVlocalMapping {
 }
 
 process HPVlocalMappingStats {
-  publishDir "${params.outdir}/hpv_mapping/local", mode: 'copy'
+  publishDir "${params.outdir}/hpv_mapping/pergenotype", mode: 'copy'
   
   input:
   set val(prefix), file(bam) from hpv_local_bam
@@ -672,7 +673,7 @@ process HPVlocalMappingStats {
 
 
 process HPVcoverage {
-  publishDir "${params.outdir}/hpv_mapping/local", mode: 'copy'
+  publishDir "${params.outdir}/hpv_mapping/pergenotype", mode: 'copy'
 
   input:
   set val(prefix), file(bam) from hpv_cov_bam
@@ -695,22 +696,27 @@ process HPVcoverage {
  */
 
 process extractBreakpointsSequence {
-   publishDir "${params.outdir}/hpv_mapping/softclipped", mode: 'copy'
+   publishDir "${params.outdir}/hpv_mapping/softclipped", mode: 'copy',
+               saveAs: {filename -> 
+                   if (filename.indexOf(".mqc") > 0) "mqc/$filename"
+		   else filename}
 
    input:
    set val(prefix), file(bam) from hpv_soft_bam
 
    output:
    set val(prefix), file("*.mqc") into bkp_pos mode 'flatten'
-   set val(prefix), file("*.csv") into bkp_seq
+   set val(prefix), file("*.csv") into bkp_info
    set val(prefix), file("*.fa") into clipped_seq
 
    script:
    pfix= bam.toString() - ~/.bam$/
    """
-   extractSoftclipped.py -v --mqc --stranded --minLen 10 ${bam}
+   extractSoftclipped.py -v --mqc --stranded --minLen ${params.minLen} ${bam}
    sort -k1,1n ${pfix}_3prime_bkp.mqc | awk 'BEGIN{nr=1} nr<\$1{for (i=nr;i<\$1;i++){print i"\t"0} nr=\$1}{print; nr+=1}' > file1.tmp
+   mv file1.tmp ${pfix}_3prime_bkp.mqc
    sort -k1,1n ${pfix}_5prime_bkp.mqc | awk 'BEGIN{nr=1} nr<\$1{for (i=nr;i<\$1;i++){print i"\t"0} nr=\$1}{print; nr+=1}' > file2.tmp
+   mv file2.tmp ${pfix}_5prime_bkp.mqc
    """
 }
 
@@ -743,7 +749,7 @@ if (!params.skip_blat){
       publishDir "${params.outdir}/hpv_mapping/blat", mode: 'copy'
 
       input:
-      set val(prefix), file(psl), file(csv) from blat_res.join(bkp_seq)
+      set val(prefix), file(psl), file(csv) from blat_res.join(bkp_info)
  
       output:
       set val(prefix), file("*_table_filtered.csv") into ttd
@@ -751,17 +757,10 @@ if (!params.skip_blat){
 
       script:
       pfix= psl.toString() - ~/(.tsv)?$/
-      if (params.blat_extract_hits) {
       """
-      extract_hits.py -f ${psl} -b ${csv}
+      blatParser.py -f ${psl} -b ${csv}
       """
-      }else{
-      """
-      blat_parser.py ${psl}
-      """       
-      }
    }
-   
 }else{
    ttd = Channel.from(false)
 }

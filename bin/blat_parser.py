@@ -101,7 +101,6 @@ try:
     data_filtered_renamed = data_filtered_renamed.set_index('ends_key')
     data_filtered_renamed.update(ends_by_key)
 
-
     cleaned = data_filtered_renamed
     cleaned['score'] = 0
     # Create a key that will be used to group rows
