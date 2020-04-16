@@ -601,7 +601,6 @@ def check_genotypes(geno) {
 
 sel_hpv_geno
         .filter { geno -> check_genotypes(geno) }
-        .dump(tag: "toto")
     	.into { hpv_geno_filter; hpv_geno_mqc_config }
 
 /*
@@ -706,8 +705,8 @@ process extractBreakpointsSequence {
 
    output:
    set val(prefix), file("*.mqc") into bkp_pos mode 'flatten'
-   set val(prefix), file("*.csv") into bkp_info
-   set val(prefix), file("*.fa") into clipped_seq
+   set val(pfix), file("*.csv") into bkp_info
+   set val(pfix), val(prefix), file("*.fa") into clipped_seq
 
    script:
    pfix= bam.toString() - ~/.bam$/
@@ -733,13 +732,12 @@ if (!params.skip_blat){
 
       input:
       file(blatdb) from blat_database.collect()
-      set val(prefix),file(fasta) from clipped_seq
+      set val(pfix), val(sname), file(fasta) from clipped_seq
  
       output:
-      set val(prefix), file("*.tsv") into blat_res
+      set val(pfix), val(sname), file("*.tsv") into blat_res
 
       script:
-      pfix= fasta.toString() - ~/(.fa)?$/
       """
       blat ${blatdb} ${fasta} ${pfix}.tsv -noHead -minScore=25 -minIdentity=90
       """
@@ -749,14 +747,13 @@ if (!params.skip_blat){
       publishDir "${params.outdir}/hpv_mapping/blat", mode: 'copy'
 
       input:
-      set val(prefix), file(psl), file(csv) from blat_res.join(bkp_info)
+      set val(pfix), val(sname), file(psl), file(csv) from blat_res.join(bkp_info).dump(tag:"blat")
  
       output:
-      set val(prefix), file("*_table_filtered.csv") into ttd
-      set val(prefix), file("*_table.csv") into table
+      set val(sname), file("*filtered.csv") into ttd
+      set val(sname), file("*.csv") into table
 
       script:
-      pfix= psl.toString() - ~/(.tsv)?$/
       """
       blatParser.py -f ${psl} -b ${csv}
       """

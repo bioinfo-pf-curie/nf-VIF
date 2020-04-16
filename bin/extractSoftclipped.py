@@ -209,6 +209,8 @@ if __name__ == "__main__":
                     ## Get bkp motif
                     mStart =  bkpStart - (int(args.minLen) + 1)
                     mEnd = bkpStart + (int(args.minLen) - 1)
+                    #mStart = bkpStart - 21
+                    #mEnd = bkpStart + 19
                     if mStart < 0:
                         mStart = 0
                     if mEnd >= len(read.seq):
