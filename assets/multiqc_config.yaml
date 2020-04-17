@@ -74,8 +74,15 @@ custom_data:
               format: '{:.0f}'
               placement: 2000
             feature:
+              title: 'Clipping'
+              description: 'Clipped part of the reads (5/3 ends)'
+              scale: false
+              format: '{:.0f}'
+              placement: 3000
+              hidden: true
+            virus_bkp_orientation:
               title: 'HPV Orientation'
-              description: '5/3 end of reads'
+              description: 'HPV reads strand'
               scale: false
               format: '{:.0f}'
               placement: 4000
@@ -85,44 +92,68 @@ custom_data:
               max: 10
               scale: 'YlOrBr'
               format: '{:.0f}'
-              placement: 3000
-            position:
+              placement: 5000
+            virus_bkp_pos:
               title: 'HPV Position'
               scale: false
               format: '{:.0f}'
-              placement: 5000
-            chr:
+              placement: 6000
+            human_bkp_chr:
               title: 'Chromosome'
               scale: false
               format: '{:.0f}'
-              placement: 6000
-            chr_position:
+              placement: 7000
+            human_chr_pos:
               title: 'Breakpoint'
               scale: false
               format: '{:.0f}'
-              placement: 7000
-            end:
+              placement: 8000
+            human_end:
               title: 'Reads Ends'
               description: Max reads end positions
               scale: false
               format: '{:.0f}'
-              placement: 8000
-            strand:
-              title: 'Orientation'
-              scale: false
               placement: 9000
+            human_orientation:
+              title: 'Orientation'
+              description: 'human reads strand'
+              scale: false
+              placement: 10000
             match:
               title: 'Match'
               description: 'Number of matching bases that are not repeats'
               scale: false
               format: '{:.0f}'
-              placement: 10000
-            counts:
+              placement: 11000
+              hidden: true
+            count:
               title: 'Counts'
               description: 'Number of reads supporting the event'
               scale: 'YlOrBr'
               format: '{:.0f}'
-              placement: 11000
+              placement: 12000
+            countHQ:
+              title: 'CountsHQ'
+              description: 'High-quality reads suporting the event'
+              scale: 'YlOrBr'
+              format: '{:.0f}'
+              placement: 13000
+              hidden: true
+            motif:
+              title: 'HPV/Human motif'
+              description: 'Motif junction between HPV and Human genomes'
+              scale: false
+              format: '{:.0f}'
+              placement: 14000
+              hidden: true
+            max_flanking_seq:
+              title: "Flanking sequence"
+              description: "Longest Human flanking sequence at breakpoint"
+              scale: false
+              format: '{:.0f}'
+              placement: 15000  
+              hidden: true
+
 
 sp:
    ctrl_stats:
@@ -162,7 +193,7 @@ table_columns_visible:
 table_cond_formatting_rules:
     score:
         pass:
-            - gt: 8
+            - gt: 7.99
         warn:
             - lt: 8
         fail:

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-# Author(s): Marc Deloger, Dimitri Desvillechabrol
-# Author(s): Tina Alaeitabar, Nicolas Servant
+# Author(s): Marc Deloger, Dimitri Desvillechabrol, Tina Alaeitabar, Nicolas Servant
 # Contact: nicolas.servant@curie.fr
 
 # Copyright Institut Curie 2019-2020
@@ -18,7 +17,7 @@ import re
 import pandas as pd
 import numpy as np
 
-pd.set_option('display.max_rows', None, 'display.max_columns', None, 'display.max_colwidth', 100)
+pd.set_option('display.max_rows', None, 'display.max_columns', None, 'display.max_colwidth', 200)
 
 
 def loadBlat(filename, minProp=0.8):
@@ -60,7 +59,8 @@ def loadBlat(filename, minProp=0.8):
     ## update colums
     data = data.rename(columns={"Tname": "chr", "Qsize": "size"})
     data['human_orientation'] = np.where(data['strand'] == '+', "forward","reverse")
-    
+    data['virus_strand'] = np.where(data['feature'] == '3prime', "<---","--->")
+
     # Filter rows having 'Qgapbases <= 5 & Tgapbases <= 5 & prop >0.9'
     data = data.query('Qgapbases <= 5 & Tgapbases <= 5 & prop > @minProp')
 
@@ -125,8 +125,8 @@ def groupBlat(data_grouped):
 
     ## Add a count column with the number of reads for a given breakpoint
     ## Use the number of unique read name
-    data_grouped['countBlat'] = 0
-    data_grouped['countBlat'] = data_grouped['read'].groupby(
+    data_grouped['countHQ'] = 0
+    data_grouped['countHQ'] = data_grouped['read'].groupby(
         data_grouped['bkp_key']
     ).nunique()
      
@@ -148,7 +148,7 @@ def getMaxFlanqSeq(BP_filename):
     df.drop_duplicates(inplace=True)
 
     ## Counts unique read names with the same motif
-    df['countBkp']=df.groupby('Sequence')['Read_Name'].transform('nunique') 
+    df['count']=df.groupby('Sequence')['Read_Name'].transform('nunique') 
     df['virus_bkp_orientation'] = np.where(df['Label'] == '3prime', "<---","--->")
  
     ## Add the Max_Flanking_Seq for each cases
@@ -156,7 +156,11 @@ def getMaxFlanqSeq(BP_filename):
     df['Length_Max'] = df.groupby(['Sequence'])['Length_Seq'].transform('max')
     df_max = df.loc[df['Length_Seq'] == df['Length_Max']]
     df_max = df_max[['Flanking_Seq']]
-    df_max = df_max.rename(columns={'Flanking_Seq':'Max_Flanking_Seq'})
+
+    ## Select randomly one max sequence if multiple available
+    fseq = df_max.groupby(['Sequence'])['Flanking_Seq'].nth(0)
+    df_max.update(fseq)
+    df_max = df_max.rename(columns={'Flanking_Seq':'max_flanking_seq'})
     df = pd.merge(df,df_max, how='left', on=['Sequence'])
    
     #df_grouped = df.groupby(['Sequence']).agg({'Length_Seq':'max'})
@@ -168,7 +172,7 @@ def getMaxFlanqSeq(BP_filename):
     #df= df.set_index('Sequence')
     #df.update(flanking_seq)
 
-    df.sort_values(by ='countBkp', ascending=False, inplace=True)
+    df.sort_values(by ='count', ascending=False, inplace=True)
     df.reset_index(inplace=True)
     df.rename(columns={'Pos_Ref': 'virus_bkp_pos'}, inplace=True)
     del df_max
@@ -189,6 +193,7 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     #merged = pd.merge(df_bp_selected,df_hits, how='left', right_on=['read'], left_on = ['Read_Name'],indicator=True)
 
     merged.drop(columns=['Read_Name','Coordinate_Fasta','Length_Seq','Length_Max','Breakpoint','size',
+                         'Flanking_Seq','position','Label','strand',
                          'SoftClip_Position','read','BreakPoint_Position','CigarString'], inplace=True)
     merged_both=merged.loc[merged['_merge'] =='both'].copy()
     merged_left=merged.loc[merged['_merge'] =='left_only'].copy()
@@ -202,38 +207,29 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
         + merged_both['chr_position'].astype(str)
     )
     merged_both['chr_count'] = merged_both.groupby(['Sequence'])['chr_key'].transform('nunique')
+    merged_both = merged_both.drop(columns=['chr_key', 'mkey'])
 
     ## Match and Score value
     merged_both['match'] = merged_both.groupby(['Sequence'])['match'].transform(max)
     merged_both['score'] = merged_both.groupby(['Sequence'])['score'].transform(max)
-
-    ## Merge countBLAT value
-    #merged_both['countBlat'] = merged_both.groupby(['Sequence'])['countBlat'].transform(sum)
+    merged_both['countHQ'] = merged_both.groupby(['Sequence'])['countHQ'].transform(max)
     merged_both = merged_both.set_index('Sequence')
 
     ## Chromosomes
     Tname = merged_both.groupby(['Sequence'], as_index = True)['chr'].apply(lambda x: "%s" % '|'.join(np.unique((x))))
     merged_both.update(Tname)
-
-    ## Position
-    #chrpos = merged_both.groupby(['Sequence'], as_index=True)['chr_position'].apply(lambda x: "%s" % '|'.join((x)))
-    #merged_both.update(chrpos)
-    
-    ## Ends
-    #ends = merged_both.groupby(['Sequence'], as_index=True)['end'].apply(lambda x: "%s" % '|'.join(str(x)))
-    #merged_both.update(ends)
-
-    ## Orientation
-    #hor = merged_both.groupby(['Sequence'], as_index=True)['human_orientation'].apply(lambda x: "%s" % '|'.join(str(x)))
-    #merged_both.update(hor)
     
     ## Transform multiHits information to ease table interpretation
-    merged_both['human_bkp_chr'] = np.where(merged_both['chr_count'] == 1, merged_both['chr'], 'multiHits')
+    merged_both['chr'] = np.where(merged_both['chr_count'] == 1, merged_both['chr'], 'multiHits')
     merged_both['human_orientation'] = np.where(merged_both['chr_count'] == 1, merged_both['human_orientation'],'-')
     merged_both['human_orientation'] = np.where(merged_both['human_orientation'] == 'forward', '--->','<---')
-    merged_both['human_bkp_pos'] = np.where(merged_both['chr_count'] == 1, merged_both['chr_position'].astype(int),'-')
+    merged_both['chr_position'] = np.where(merged_both['chr_count'] == 1, merged_both['chr_position'].astype(int),'-')
     merged_both['end'] = np.where(merged_both['chr_count'] == 1, merged_both['end'].astype(int),'-')
+    merged_both = merged_both.rename(columns={"chr":"human_bkp_chr", "chr_position":"human_bkp_pos"})
+
     merged_both.drop_duplicates(inplace=True)
+    #print(merged_both.columns)
+    #print(merged_both)
 
     ## no Hits
     merged_left['match'] = 0
@@ -244,11 +240,11 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     merged_left = merged_left.set_index('Sequence')
 
     ## Export
-    merged_both_order = merged_both[['genotype', 'feature', 'countBlat', 'countBkp', 'score', 'virus_bkp_pos', 'virus_bkp_orientation', 
-                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Max_Flanking_Seq']]
+    merged_both_order = merged_both[['genotype', 'feature', 'countHQ', 'count', 'score', 'virus_bkp_pos', 'virus_bkp_orientation', 
+                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'max_flanking_seq']]
     
-    merged_left_order = merged_left[['genotype', 'feature', 'countBlat', 'countBkp', 'score', 'virus_bkp_pos', 'virus_bkp_orientation',
-                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Max_Flanking_Seq']]
+    merged_left_order = merged_left[['genotype', 'feature', 'countHQ', 'count', 'score', 'virus_bkp_pos', 'virus_bkp_orientation',
+                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'max_flanking_seq']]
 
     ## Clean
     del merged_both
@@ -332,24 +328,26 @@ def addScore(df):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--blat", help="BLAT output file")
-    parser.add_argument("-b", "--bkp", help="Breaking Point file")
+    parser.add_argument("-b", "--bkp", help="Breakpoint file with motif and flanking sequence", default=None)
+    parser.add_argument("-p", "--minProp", help="Minimum BLAT mapping proportion to keep a read", default=0.8)
     parser.add_argument("-o", "--outputDir", help="Output directory", default="./")
     parser.add_argument("-s", "--sname", help="Sample Name", default="")
 
     args = parser.parse_args()
 
+    ## I/O
     base = os.path.basename(args.blat)
     base = re.sub(r'\.tsv$', '', base)
-
     table = open(args.outputDir + "/" + base + '_table.csv', 'w')
     table_filtered = open(args.outputDir + "/" + base + '_table_filtered.csv', 'w')
-    table1 = open(args.outputDir + "/" + base + '_table1.csv', 'w')
-    table1_filtered = open(args.outputDir + "/" + base + '_table1_filtered.csv', 'w')
+    if args.bkp:
+        tableBkp = open(args.outputDir + "/" + base + '_bkptable.csv', 'w')
+        tableBkp_filtered = open(args.outputDir + "/" + base + '_bkptable_filtered.csv', 'w')
 
     try:
         ##########################################
         ## BLAT results
-        df_hits = loadBlat(args.blat)
+        df_hits = loadBlat(args.blat, minProp=args.minProp)
         df_grouped = groupBlat(df_hits)
         df_grouped = addScore(df_grouped)
  
@@ -359,62 +357,65 @@ if __name__ == "__main__":
             df_grouped.insert(0,'sample',os.path.splitext(base)[0])
 
         table_to_display = df_grouped.reindex(columns=[
-            'multiqc_index', 'sample', 'genotype', 'feature', 'score', 'position',
-            'chr', 'chr_position', 'end', 'strand', 'match', 'countBlat'])
+            'multiqc_index', 'sample', 'genotype', 'feature', 'score', 'position','virus_strand',
+            'chr', 'chr_position', 'end', 'strand', 'match', 'countHQ'])
         table_to_display = table_to_display.drop_duplicates()
         table_to_display = table_to_display.reset_index(drop=True)
         table_to_display['multiqc_index'] = (
             table_to_display['sample'] + '|' + table_to_display.index.astype(str)
         )
-        table_to_display.sort_values(by=['score', 'countBlat'], ascending=False, inplace=True)
-        table_to_display.to_csv(path_or_buf=table1, index=False, sep =",", float_format='%.0f')
+        table_to_display.sort_values(by=['score', 'countHQ'], ascending=False, inplace=True)
+        table_to_display = table_to_display.rename(columns={"position": "virus_bkp_pos", "chr":"human_bkp_chr",
+                                                            "chr_position":"human_bkp_pos", "end":"human_end",
+                                                            "strand":"human_orientation", "virus_strand":"virus_bkp_orientation"})
+        table_to_display.to_csv(path_or_buf=table, index=False, sep =",", float_format='%.0f')
 
         table_to_display = table_to_display[
             (table_to_display['score'] >= 4)
             & (table_to_display['match'] >= 10)
-            & (table_to_display['countBlat'] >= 2)
+            & (table_to_display['countHQ'] >= 2)
         ]
-        table_to_display.to_csv(path_or_buf=table1_filtered, index=False, sep =",", float_format='%.0f')
+        table_to_display.to_csv(path_or_buf=table_filtered, index=False, sep =",", float_format='%.0f')
 
         ########################################
-        ## Merge with flanking sequences
-        df_bp_selected = getMaxFlanqSeq(args.bkp)
-        (merged_both_order, merged_left_order)=merged(df_bp_selected, df_grouped)
-        del df_bp_selected
-        del df_hits
+        ## Merge with breakpoint information and flanking sequences
+        if args.bkp:
+            df_bp_selected = getMaxFlanqSeq(args.bkp)
+            (merged_both_order, merged_left_order)=merged(df_bp_selected, df_grouped)
+            del df_bp_selected
+            del df_hits
 
-        ### concatenate hits & no_hit
-        concat=pd.concat([merged_both_order,merged_left_order])
-        concat.sort_values(by='countBkp', ascending=False, inplace=True)
-        concat.drop_duplicates(inplace=True)
+            ### concatenate hits & no_hit
+            concat=pd.concat([merged_both_order,merged_left_order])
+            concat.sort_values(by='count', ascending=False, inplace=True)
+            concat.drop_duplicates(inplace=True)
 
-        # add sample name
-        if args.sname:
-            concat.insert(0,'sample',sname) 
-        else:
-            concat.insert(0,'sample',os.path.splitext(base)[0])
-        # add index for multiQC
-        concat.reset_index(inplace=True)
-        concat.insert(0,'multiqc_index', concat['sample'] + '|' + concat.index.astype(str))
-        # save
-        concat.reset_index()
-        concat = concat.rename(columns={"Flanking_Seq": "flanking_seq", "Sequence":"motif"}) 
-        concat.to_csv(path_or_buf=table, index=False, sep = ",", float_format='%.0f')
+            # add sample name
+            if args.sname:
+                concat.insert(0,'sample',args.sname) 
+            else:
+                concat.insert(0,'sample',os.path.splitext(base)[0])
+            
+            # add index for multiQC
+            concat.reset_index(inplace=True)
+            concat.insert(0,'multiqc_index', concat['sample'] + '|' + concat.index.astype(str))
+            # save
+            concat.reset_index()
+            concat = concat.rename(columns={"Flanking_Seq": "flanking_seq", "Sequence":"motif", "end":"human_end"}) 
+            concat.to_csv(path_or_buf=tableBkp, index=False, sep = ",", float_format='%.0f')
         
-        ### Filtered results
-        # filter rows to reduce noise
-        concat_filtered=concat[concat['countBkp']>=2]
-        #concat_filtered=concat_filtered[concat_filtered['human_bkp_chr'] != 'multiHits']
-        concat_filtered=concat_filtered[concat_filtered['human_bkp_chr'] != 'noHits' ]
-        concat_filtered.to_csv(path_or_buf=table_filtered, index=False, sep = ",", float_format='%.0f')
-        
-    
+            ### Filtered results
+            # filter rows to reduce noise
+            concat_filtered=concat[concat['count']>=2]
+            concat_filtered=concat_filtered[concat_filtered['human_bkp_chr'] != 'noHits' ]
+            concat_filtered.to_csv(path_or_buf=tableBkp_filtered, index=False, sep = ",", float_format='%.0f')
+
     except pd.io.common.EmptyDataError:
         print >> sys.stderr, "Input files is empty and has been skipped."
-        emptydf=pd.DataFrame(columns=['genotype', 'feature', 'countBlat', 'countBkp', 'score', 'virus_bkp_pos', 'virus_bkp_orientation',
+        emptydf=pd.DataFrame(columns=['genotype', 'feature', 'countHQ', 'count', 'score', 'virus_bkp_pos', 'virus_bkp_orientation',
                                       'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Flanking_Seq'])
         emptydf.to_csv(path_or_buf=table_filtered,index=False)
-        emptydf.to_csv(path_or_buf=table,index=False)                                                                                                                                                            
+        emptydf.to_csv(path_or_buf=table,index=False)
 
     except:
         raise
