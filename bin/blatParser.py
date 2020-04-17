@@ -21,7 +21,7 @@ import numpy as np
 pd.set_option('display.max_rows', None, 'display.max_columns', None, 'display.max_colwidth', 100)
 
 
-def loadBlat(filename):
+def loadBlat(filename, minProp=0.8):
     """
     Load and filter BLAT hits file
     """
@@ -59,15 +59,15 @@ def loadBlat(filename):
     
     ## update colums
     data = data.rename(columns={"Tname": "chr", "Qsize": "size"})
-    data['human_orientation'] = np.where(data['strand'] == '+', "Forward","Reverse")
+    data['human_orientation'] = np.where(data['strand'] == '+', "forward","reverse")
     
     # Filter rows having 'Qgapbases <= 5 & Tgapbases <= 5 & prop >0.9'
-    data = data.query('Qgapbases <= 5 & Tgapbases <= 5 & prop > 0.9')
+    data = data.query('Qgapbases <= 5 & Tgapbases <= 5 & prop > @minProp')
 
     ## Remove unused columns
     data = data.drop(columns=['mismatch','repmatch','Ns','Qgapcount','Qgapbases','Tgapcount','Tgapbases','prop',
                               'Qstart','Qend','Tsize','blockcount','blockSizes','qStarts','Tend','Tstart','tStarts'])
-    
+
     return(data)
 
 
@@ -133,7 +133,7 @@ def groupBlat(data_grouped):
     # remove key columns and index
     data_grouped = data_grouped.drop(columns=['bkp_key'])
     data_grouped = data_grouped.reset_index(drop=True)
-    
+
     return(data_grouped)
     
 
@@ -148,24 +148,30 @@ def getMaxFlanqSeq(BP_filename):
     df.drop_duplicates(inplace=True)
 
     ## Counts unique read names with the same motif
-    df['countBkp']=df.groupby("Sequence")["Read_Name"].transform('nunique')
- 
+    df['countBkp']=df.groupby('Sequence')['Read_Name'].transform('nunique') 
     df['virus_bkp_orientation'] = np.where(df['Label'] == '3prime', "<---","--->")
-
-    df_grouped = df.groupby(['Sequence']).agg({'Length_Seq':'max'})
-    df_grouped = df_grouped.reset_index()
-    df_grouped = df_grouped.rename(columns={'Length_Seq':'Length_Max'})
-    df = pd.merge(df,df_grouped, how='left', on=['Sequence'])
-    df = df.loc[df['Length_Seq'] == df['Length_Max']]
-
-    flanking_seq=df.groupby('Sequence')['Flanking_Seq'].nth(0)
-    df= df.set_index('Sequence')
-    df.update(flanking_seq)
+ 
+    ## Add the Max_Flanking_Seq for each cases
+    df = df.set_index('Sequence')
+    df['Length_Max'] = df.groupby(['Sequence'])['Length_Seq'].transform('max')
+    df_max = df.loc[df['Length_Seq'] == df['Length_Max']]
+    df_max = df_max[['Flanking_Seq']]
+    df_max = df_max.rename(columns={'Flanking_Seq':'Max_Flanking_Seq'})
+    df = pd.merge(df,df_max, how='left', on=['Sequence'])
+   
+    #df_grouped = df.groupby(['Sequence']).agg({'Length_Seq':'max'})
+    #df_grouped = df_grouped.reset_index()
+    #df_grouped = df_grouped.rename(columns={'Length_Seq':'Length_Max'})
+    #df = pd.merge(df,df_grouped, how='left', on=['Sequence'])
+    #df = df.loc[df['Length_Seq'] == df['Length_Max']]
+    #flanking_seq=df.groupby('Sequence')['Flanking_Seq'].nth(0)
+    #df= df.set_index('Sequence')
+    #df.update(flanking_seq)
 
     df.sort_values(by ='countBkp', ascending=False, inplace=True)
     df.reset_index(inplace=True)
     df.rename(columns={'Pos_Ref': 'virus_bkp_pos'}, inplace=True)
-    del df_grouped
+    del df_max
 
     return (df)
     
@@ -175,28 +181,34 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     Merged BLAT hits & flanking_seq information
     The main key here is the motif around the breakpoint
     """
-    merged = pd.merge(df_bp_selected,df_hits, how='left', right_on=['read'], left_on = ['Read_Name'],indicator=True)
-    merged.drop(columns=['Read_Name','Coordinate_Fasta','Length_Seq','Breakpoint','size',
-                         'SoftClip_Position','read','BreakPoint_Position','Length_Max','CigarString'], inplace=True)
+
+    ## Need to take into account the virus position to merge
+    df_bp_selected['mkey'] = (df_bp_selected['Read_Name'] + "|" + df_bp_selected['virus_bkp_pos'].astype(str))
+    df_hits['mkey'] = (df_hits['read'] + "|" + df_hits['position'].astype(str))
+    merged = pd.merge(df_bp_selected, df_hits, how='left', right_on=['mkey'], left_on = ['mkey'], indicator=True)
+    #merged = pd.merge(df_bp_selected,df_hits, how='left', right_on=['read'], left_on = ['Read_Name'],indicator=True)
+
+    merged.drop(columns=['Read_Name','Coordinate_Fasta','Length_Seq','Length_Max','Breakpoint','size',
+                         'SoftClip_Position','read','BreakPoint_Position','CigarString'], inplace=True)
     merged_both=merged.loc[merged['_merge'] =='both'].copy()
     merged_left=merged.loc[merged['_merge'] =='left_only'].copy()
     del[merged]
     merged_both.drop_duplicates(inplace=True)
-    merged_left.drop_duplicates(inplace=True) 
+    merged_left.drop_duplicates(inplace=True)
 
     ## Count number of mapping hits using both chromosome and position
     merged_both['chr_key'] = (
         merged_both['chr'] + "|"
         + merged_both['chr_position'].astype(str)
     )
-    merged_both['chr_count'] = merged_both.groupby(['Sequence'])['chr_key'].transform('nunique') 
+    merged_both['chr_count'] = merged_both.groupby(['Sequence'])['chr_key'].transform('nunique')
 
     ## Match and Score value
     merged_both['match'] = merged_both.groupby(['Sequence'])['match'].transform(max)
     merged_both['score'] = merged_both.groupby(['Sequence'])['score'].transform(max)
 
     ## Merge countBLAT value
-    merged_both['countBlat'] = merged_both.groupby(['Sequence'])['countBlat'].transform(sum)
+    #merged_both['countBlat'] = merged_both.groupby(['Sequence'])['countBlat'].transform(sum)
     merged_both = merged_both.set_index('Sequence')
 
     ## Chromosomes
@@ -233,10 +245,10 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
 
     ## Export
     merged_both_order = merged_both[['genotype', 'feature', 'countBlat', 'countBkp', 'score', 'virus_bkp_pos', 'virus_bkp_orientation', 
-                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Flanking_Seq']]
+                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Max_Flanking_Seq']]
     
     merged_left_order = merged_left[['genotype', 'feature', 'countBlat', 'countBkp', 'score', 'virus_bkp_pos', 'virus_bkp_orientation',
-                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Flanking_Seq']]
+                                     'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Max_Flanking_Seq']]
 
     ## Clean
     del merged_both
