@@ -212,7 +212,7 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     ## Match and Score value
     merged_both['match'] = merged_both.groupby(['Sequence'])['match'].transform(max)
     merged_both['score'] = merged_both.groupby(['Sequence'])['score'].transform(max)
-    merged_both['countHQ'] = merged_both.groupby(['Sequence'])['countHQ'].transform(max)
+    merged_both['countHQ'] = merged_both.groupby(['Sequence'])['countHQ'].transform(max) ## not sure ...
     merged_both = merged_both.set_index('Sequence')
 
     ## Chromosomes
@@ -228,8 +228,6 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     merged_both = merged_both.rename(columns={"chr":"human_bkp_chr", "chr_position":"human_bkp_pos"})
 
     merged_both.drop_duplicates(inplace=True)
-    #print(merged_both.columns)
-    #print(merged_both)
 
     ## no Hits
     merged_left['match'] = 0
