@@ -53,8 +53,8 @@ custom_data:
     insertion_summary:
         file_format: 'csv'
         section_name: 'Insertion Sites'
-        description: ' detected on Human reference genome. <b>CountHQ</b> report the number of high quality BLAT reads at the breakpoint position. 
-	<b>Count</b> reports the number of reads detected with breakpoint motif (regardless the BLAT results). The <b>score</b> is calculated as follow: <b>+1</b> if two
+        description: ' detected on Human reference genome. <b>CountHQ</b> reports the number of high quality BLAT reads at the breakpoint position. 
+	<b>Count</b> reports the number of reads detected with the same breakpoint motif (regardless the BLAT results). The <b>score</b> is calculated as follow: <b>+1</b> if two
 	breakpoints in both orientation are detected on the same chromosome / <b>+3</b> if at least two reads support the breakpoints / <b>+6</b> if the read is uniquely 
 	aligned at the breakpoint position. The mean score per breakpoint is reported.'
         plot_type: 'table'
@@ -141,7 +141,6 @@ custom_data:
               scale: 'YlOrBr'
               format: '{:.0f}'
               placement: 13000
-              hidden: true
             motif:
               title: 'HPV/Human motif'
               description: 'Motif junction between HPV and Human genomes'

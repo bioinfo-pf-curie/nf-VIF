@@ -24,7 +24,7 @@ def loadBlat(filename, minProp=0.8):
     """
     Load and filter BLAT hits file
     """
-    data = pd.read_csv(filename, sep="\t")    
+    data = pd.read_csv(filename, sep="\t", header=None)    
     base = os.path.basename(filename)
         
     # Set columns name
@@ -32,14 +32,16 @@ def loadBlat(filename, minProp=0.8):
                     'Qgapbases', 'Tgapcount', 'Tgapbases', 'strand', 'Qname',
                     'Qsize', 'Qstart', 'Qend', 'Tname', 'Tsize', 'Tstart', 'Tend',
                     'blockcount', 'blockSizes', 'qStarts', 'tStarts']    
-        
+
     # Split query name values
     new = data['Qname'].str.split('|', expand=True)
+    print(new)
     data['read'] = new[0]
     data['genotype'] = new[1]
     data['feature'] = new[2]
     data['position'] = new[3]
     data.drop(columns=['Qname'], inplace=True)    
+
     
     # Add column with mapped query's proportion
     data['prop'] = (data['Qend'] - data['Qstart']) / data['Qsize']    
@@ -200,8 +202,6 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     del[merged]
     merged_both.drop_duplicates(inplace=True)
     merged_left.drop_duplicates(inplace=True)
-
-    print(merged_both)
 
     ## Count number of mapping hits using both chromosome and position
     merged_both['chr_key'] = (
