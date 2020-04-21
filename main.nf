@@ -286,15 +286,18 @@ if (params.samplePlan) {
 }else{
    summary['Reads']        = params.reads
 }
-summary['Fasta Ref']    = params.fasta
-summary['BLAT database']= params.blatdb
-summary['Fasta HPV']    = params.fastaHpv
-summary['Split report'] = params.splitReport
-summary['Max Memory']   = params.max_memory
-summary['Max CPUs']     = params.max_cpus
-summary['Max Time']     = params.max_time
-summary['Output dir']   = params.outdir
-summary['Working dir']  = workflow.workDir
+summary['Fasta Ref']      = params.fasta
+summary['BLAT database']  = params.blatdb
+summary['Fasta HPV']      = params.fastaHpv
+summary['Min MAPQ']       = params.minMapq
+summary['Min length']     = params.minLen
+summary['Min Freq Geno']  = params.minFreqGeno
+summary['Split report']   = params.splitReport
+summary['Max Memory']     = params.max_memory
+summary['Max CPUs']       = params.max_cpus
+summary['Max Time']       = params.max_time
+summary['Output dir']     = params.outdir
+summary['Working dir']    = workflow.workDir
 summary['Container Engine'] = workflow.containerEngine
 summary['Current user']   = "$USER"
 summary['Working dir']    = workflow.workDir
@@ -685,7 +688,7 @@ process HPVcoverage {
 
   script:
   pfix= bam.toString() - ~/(_sorted)?(.bam)?$/
-  normOpts = params.splitReport ? "--normalizeUsing CPM" : "--normalizeUsing None"
+  normOpts = params.splitReport ? "--normalizeUsing CPM" : ""
   """
   samtools index ${bam}
   bamCoverage -b ${bam} --binSize 50 ${normOpts} --outFileFormat bedgraph -o ${pfix}.bedgraph
@@ -699,7 +702,7 @@ process HPVcoverage {
  */
 
 process extractBreakpointsSequence {
-   publishDir "${params.outdir}/hpv_mapping/softclipped", mode: 'copy',
+   publishDir "${params.outdir}/hpvMapping/softclipped", mode: 'copy',
                saveAs: {filename -> 
                    if (filename.indexOf(".mqc") > 0) "mqc/$filename"
 		   else filename}
@@ -829,7 +832,7 @@ if (params.splitReport){
 
       output:
       set val(prefix),file('*conf.mqc') into mqcHpvConf
-      set val(prefix),file('*bkp.mqc') into mqcGenepos
+      set val(prefix),file('*bkp.mqc') optional true into mqcGenepos
 
       script:
       prefix = geno.toString() - "_HPVgenotyping.filtered"

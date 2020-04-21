@@ -67,7 +67,7 @@ def loadBlat(filename, minProp=0.8):
     ## Remove unused columns
     data = data.drop(columns=['mismatch','repmatch','Ns','Qgapcount','Qgapbases','Tgapcount','Tgapbases','prop',
                               'Qstart','Qend','Tsize','blockcount','blockSizes','qStarts','Tend','Tstart','tStarts'])
-
+    
     return(data)
 
 
@@ -200,6 +200,8 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     del[merged]
     merged_both.drop_duplicates(inplace=True)
     merged_left.drop_duplicates(inplace=True)
+
+    print(merged_both)
 
     ## Count number of mapping hits using both chromosome and position
     merged_both['chr_key'] = (

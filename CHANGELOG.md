@@ -2,20 +2,17 @@
 ## CHANGES IN VERSION 1.1.0
 
 TODO:
-- replace CPM by reads number
-- counts = utiliser tous les reads ?
-- Peut-on fusionner les codes sur le summary ?
 - Test insertion multiple - in silico ?
 - Test mapQ20 ?
 - Test ref hpv simplifié ?
 - Extraire les séquences de genes et faire un variant calling dessus ?
-- template
+- Jonction HPV/hpv
 - mqc report
 
 
 NEW FEATURES
    
-   o New minMapq option to provide the minimum mapping quality for the mapping steps
+   o New --minMapq option to provide the minimum mapping quality for the mapping steps
 
    o New --minLen option to provide the minimum length of clipped sequence to consider
 
@@ -24,6 +21,10 @@ NEW FEATURES
    o Manage overlapping R1/R2 reads reporting the same breakpoint
 
 SIGNIFICANT USER-VISIBLE CHANGES
+
+   o Report genotype available at --FreqGeno % of hpv mapped reads
+
+   o Coverage plot - y axis in reads count when splitReport is specified (CPM otherwise)
 
    o Report end as max reads position
 

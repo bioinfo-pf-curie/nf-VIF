@@ -53,7 +53,10 @@ custom_data:
     insertion_summary:
         file_format: 'csv'
         section_name: 'Insertion Sites'
-        description: ' detected on Human reference genome.'
+        description: ' detected on Human reference genome. <b>CountHQ</b> report the number of high quality BLAT reads at the breakpoint position. 
+	<b>Count</b> reports the number of reads detected with breakpoint motif (regardless the BLAT results). The <b>score</b> is calculated as follow: <b>+1</b> if two
+	breakpoints in both orientation are detected on the same chromosome / <b>+3</b> if at least two reads support the breakpoints / <b>+6</b> if the read is uniquely 
+	aligned at the breakpoint position. The mean score per breakpoint is reported.'
         plot_type: 'table'
         pconfig:
             namespace: 'insertion_summary'
@@ -103,7 +106,7 @@ custom_data:
               scale: false
               format: '{:.0f}'
               placement: 7000
-            human_chr_pos:
+            human_bkp_pos:
               title: 'Breakpoint'
               scale: false
               format: '{:.0f}'
@@ -126,15 +129,15 @@ custom_data:
               format: '{:.0f}'
               placement: 11000
               hidden: true
-            count:
-              title: 'Counts'
-              description: 'Number of reads supporting the event'
+            countHQ:
+              title: 'CountsHQ'
+              description: 'Number of high-quality reads aligned with a good quality at the breakpoint position'
               scale: 'YlOrBr'
               format: '{:.0f}'
               placement: 12000
-            countHQ:
-              title: 'CountsHQ'
-              description: 'High-quality reads suporting the event'
+            count:
+              title: 'Counts'
+              description: 'Number of reads with a motif suporting the breakpoint'
               scale: 'YlOrBr'
               format: '{:.0f}'
               placement: 13000
