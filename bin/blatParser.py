@@ -406,7 +406,7 @@ if __name__ == "__main__":
         
             ### Filtered results
             # filter rows to reduce noise
-            concat_filtered=concat[concat['count']>=2]
+            concat_filtered=concat[(concat['count']>=2) & (concat['countHQ']>=2)]
             concat_filtered=concat_filtered[concat_filtered['human_bkp_chr'] != 'noHits' ]
             concat_filtered.to_csv(path_or_buf=tableBkp_filtered, index=False, sep = ",", float_format='%.0f')
 
