@@ -65,9 +65,8 @@ HPV References:
 Advanced options:
   --minMapq                     Minimum reads mapping quality. Default: 0
   --minLen                      Minimum trimmed length sequence to consider. Default: 15
-  --minFreqGeno                 Fraction of reads to consider a genotpye. Default: 0.2
-  --nbGeno                      Number of HPV genotype to consider
-  --splitReport                 Generate one report per sample
+  --minFreqGeno                 Fraction of reads to consider a genotpye. Default: 0.1
+  --splitReport                 Generate one report per sample. Default: false
  
 Other options:
   --outdir                      The output directory where the results will be saved
