@@ -53,6 +53,7 @@ def helpMessage() {
       --fastaHpv                    Path to Fasta HPV reference (.fasta)                 
       --bwt2IndexHpv                Path to Bowtie2 index for all HPV strains
       --bwt2IndexHpvSplit           Path to Bowtie2 index per HPV strain
+      --saveReference               Save all references generated during the analysis. Default: False
 
     Advanced options:
       --minMapq                     Minimum reads mapping quality. Default: 0
@@ -458,49 +459,8 @@ process fastqc {
 }
 
 /*
- * Mapping
+ * Mapping on control regions
  */
-
-process HPVmapping {
-  tag "$prefix"
-  publishDir "${params.outdir}/hpvMapping/allref", mode: 'copy',
-        saveAs: {filename ->
-            if (filename.indexOf(".bam") == -1) "logs/$filename"
-            else filename}
-
-  input:
-  set val(prefix), file(reads) from readsHpvmap
-  file index from bwt2IndexHpv.collect()
-
-  output:
-  set val(prefix), file("${prefix}_hpvs.bam") into hpvBam
-
-  script:
-  if ( params.singleEnd ){
-  """
-  bowtie2 --rg-id BMG --rg SM:${prefix} \\
-          --very-sensitive --no-unal \\
-          -p ${task.cpus} \\
-          -x ${index}/${hpvBwt2Base} \\
-          -U ${reads} > ${prefix}_hpvs.bam
-  samtools view -h -q ${params.minMapq} ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
-  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_hpvs_filt.bam
-  mv ${prefix}_fsorted.bam ${prefix}_hpvs.bam
-  """
-  }else{
-  """
-  bowtie2 --rg-id BMG --rg SM:${prefix} \\
-          --very-sensitive --no-unal \\
-          -p ${task.cpus} \\
-          -x ${index}/${hpvBwt2Base} \\
-          -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_hpvs.bam
-  samtools view -h -q ${params.minMapq} ${prefix}_hpvs.bam > ${prefix}_hpvs_filt.bam
-  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_hpvs_filt.bam
-  mv ${prefix}_fsorted.bam ${prefix}_hpvs.bam
-  """
-  }
-}
-
 
 process ctrlMapping {
   tag "$prefix"
@@ -515,6 +475,7 @@ process ctrlMapping {
 
   output:
   set val(prefix), file("${prefix}_ctrl.bam") into ctrlBam
+  set val(prefix), file("*ctrl_bowtie2.log") into ctrlBowtie2Log
 
   script:
   if ( params.singleEnd ){
@@ -523,10 +484,7 @@ process ctrlMapping {
           --very-sensitive \\
           -p ${task.cpus} \\
           -x ${index}/ctrlRegions \\
-          -U ${reads} > ${prefix}_ctrl.bam
-  samtools view -h -q ${params.minMapq} ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam
-  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_ctrl_filt.bam
-  mv ${prefix}_fsorted.bam ${prefix}_ctrl.bam
+          -U ${reads} > ${prefix}_ctrl.bam 2> ${prefix}_ctrl_bowtie2.log
   """
   }else{
   """
@@ -534,10 +492,7 @@ process ctrlMapping {
           --very-sensitive \\
           -p ${task.cpus} \\
           -x ${index}/ctrlRegions \\
-          -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_ctrl.bam
-  samtools view -h -q ${params.minMapq} ${prefix}_ctrl.bam > ${prefix}_ctrl_filt.bam 
-  samtools sort -@  ${task.cpus} -o ${prefix}_fsorted.bam ${prefix}_ctrl_filt.bam
-  mv ${prefix}_fsorted.bam ${prefix}_ctrl.bam
+          -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_ctrl.bam 2> ${prefix}_ctrl_bowtie2.log
   """
   }
 }
@@ -553,15 +508,56 @@ process ctrlStats {
   set val(prefix), file("*ctrl.stats") into ctrlStats
 
   script:
+  peStatus = params.singleEnd ? "0" : "1"
   """
-  samtools index ${bam}
-  samtools idxstats ${bam} | cut -f1,3 | sort -k2,2nr > ${prefix}_ctrl.stats
+  nbreads=\$(samtools view -c ${bam})
+  samtools view -h -q 20 ${bam} | samtools sort -@  ${task.cpus} - > ${prefix}_fsorted_ctrl.bam
+  samtools index ${prefix}_fsorted_ctrl.bam
+  samtools idxstats ${prefix}_fsorted_ctrl.bam | cut -f1,3 | sort -k2,2nr > ${prefix}_ctrl.stats
+  awk -v isPe=${peStatus} -v tot=\$nbreads '\$1!="*"{s=s+\$2} \$1=="*"{\$1="unmapped"; \$2=tot-s} isPe==1{\$2=\$2/2} {printf "%s\\t%.0f\\n",\$1,\$2}' ${prefix}_ctrl.stats > ${prefix}_ctrl_final.stats
+  mv ${prefix}_ctrl_final.stats ${prefix}_ctrl.stats
   """
 }
 
+
 /*
- * Select Genotypes
- */
+ * HPV mapping and genotyping
+ */ 
+
+process HPVmapping {
+  tag "$prefix"
+  publishDir "${params.outdir}/hpvMapping/allref", mode: 'copy',
+        saveAs: {filename ->
+            if (filename.indexOf(".bam") == -1) "logs/$filename"
+            else filename}
+
+  input:
+  set val(prefix), file(reads) from readsHpvmap
+  file index from bwt2IndexHpv.collect()
+
+  output:
+  set val(prefix), file("${prefix}_hpvs.bam") into hpvBam
+  set val(prefix), file("*bowtie2.log") into hpvBowtie2Log
+
+  script:
+  if ( params.singleEnd ){
+  """
+  bowtie2 --rg-id BMG --rg SM:${prefix} \\
+          --very-sensitive --no-unal \\
+          -p ${task.cpus} \\
+          -x ${index}/${hpvBwt2Base} \\
+          -U ${reads} > ${prefix}_hpvs.bam 2> ${prefix}_hpvs_bowtie2.log
+  """
+  }else{
+  """
+  bowtie2 --rg-id BMG --rg SM:${prefix} \\
+          --very-sensitive --no-unal \\
+          -p ${task.cpus} \\
+          -x ${index}/${hpvBwt2Base} \\
+          -1 ${reads[0]} -2 ${reads[1]} > ${prefix}_hpvs.bam 2> ${prefix}_hpvs_bowtie2.log 
+  """
+  }
+}
 
 process selectGenotypes{
   publishDir "${params.outdir}/hpvMapping/allref", mode: 'copy'
@@ -571,20 +567,18 @@ process selectGenotypes{
 
   output:
   set val(prefix), file("${prefix}_HPVgenotyping.stats") into hpvGenoStats
+  set val(prefix), file("${prefix}_HPVgenotyping.filtered") into hpvGenoMqc
   file("${prefix}_HPVgenotyping.filtered") into selHpvGeno
 
   script:
   """
-  samtools index ${bam}
-  samtools idxstats ${bam} | cut -f1,3 | sort -k2,2nr > ${prefix}_HPVgenotyping.counts
+  samtools view -h -q ${params.minMapq} ${bam} | samtools sort -@  ${task.cpus} -o ${prefix}_fsorted_hpvs.bam -
+  samtools index ${prefix}_fsorted_hpvs.bam
+  samtools idxstats ${prefix}_fsorted_hpvs.bam | cut -f1,3 | sort -k2,2nr > ${prefix}_HPVgenotyping.counts
   nbreads=\$(samtools view -c ${bam})
   awk -v tot=\$nbreads '{printf("%s\\t%.02f\\n", \$1, \$2/tot)}' ${prefix}_HPVgenotyping.counts > ${prefix}_HPVgenotyping.freq
   awk -v minFreq=${params.minFreqGeno} -v sname=${prefix} '\$2>=minFreq{print sname","\$1}' ${prefix}_HPVgenotyping.freq > ${prefix}_HPVgenotyping.filtered
   awk '\$2>=10{print}\$2<10{others+=\$2}END{print "Others\t"others}' ${prefix}_HPVgenotyping.counts | grep -v "*" > ${prefix}_HPVgenotyping.stats
-
-  #awk -F"[_\t]" '!(\$1 in done || \$1=="Others") {print \$0; done[\$1]=1}' ${prefix}_HPVgenotyping.stats | cut -f1 > ${prefix}_HPVgenotyping.filtered.tmp
-  #sed -i -e 's/^/${prefix},/' ${prefix}_HPVgenotyping.filtered.tmp
-  #head -n 3 ${prefix}_HPVgenotyping.filtered.tmp > ${prefix}_HPVgenotyping.filtered
   """
 }
 
@@ -626,9 +620,8 @@ process HPVlocalMapping {
     .map{
       [ it["sample"], it["hpv"] ]
     }
-    .dump(tag: "mapped")
     .combine(readsSplitmap, by: 0)
-    .dump(tag: "combined")
+    .dump(tag: "hpvloc")
 
   output:
   set val(prefix), file("*.bam") into hpvLocalBam, hpvCovBam, hpvSoftBam
@@ -641,8 +634,6 @@ process HPVlocalMapping {
           -p ${task.cpus} \\
           -x ${index}/${hpv} \\
           -U ${reads} > ${prefix}-${hpv}.bam 2> ${prefix}-${hpv}_bowtie2.log
-  samtools sort -@  ${task.cpus} -o ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
-  mv ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
   """
   }else{
   """
@@ -651,11 +642,10 @@ process HPVlocalMapping {
           -p ${task.cpus} \\
           -x ${index}/${hpv} \\
           -1 ${reads[0]} -2 ${reads[1]} > ${prefix}-${hpv}.bam 2> ${prefix}-${hpv}_bowtie2.log
-  samtools sort -@  ${task.cpus} -o ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
-  mv ${prefix}-${hpv}_sorted.bam ${prefix}-${hpv}.bam
   """
   }
 }
+
 
 process HPVlocalMappingStats {
   publishDir "${params.outdir}/hpvMapping/pergenotype", mode: 'copy'
@@ -690,8 +680,9 @@ process HPVcoverage {
   pfix= bam.toString() - ~/(_sorted)?(.bam)?$/
   normOpts = params.splitReport ? "--normalizeUsing CPM" : ""
   """
-  samtools index ${bam}
-  bamCoverage -b ${bam} --binSize 50 ${normOpts} --outFileFormat bedgraph -o ${pfix}.bedgraph
+  samtools sort -@ ${task.cpus} -o ${pfix}_sorted.bam ${bam}
+  samtools index ${pfix}_sorted.bam
+  bamCoverage -b ${pfix}_sorted.bam --binSize 50 ${normOpts} --outFileFormat bedgraph -o ${pfix}.bedgraph
   awk -F"\t" '{OFS="\t"; print \$2+25,\$4}' ${pfix}.bedgraph > ${pfix}_covmatrix.mqc
   """
 }
@@ -847,6 +838,8 @@ if (params.splitReport){
         .join(fastqcResults, remainder: true)
         .join(trimgaloreResults, remainder: true)
         .join(ctrlStats)
+	.join(hpvBowtie2Log)
+	.join(hpvGenoMqc)
         .join(hpvCovStats.groupTuple(), remainder: true)
         .join(hpvBwCov.groupTuple(), remainder: true)
         .join(bkpPos.groupTuple(), remainder: true)
@@ -866,7 +859,7 @@ if (params.splitReport){
      file splan from chSplan.first()
      file multiqcConfig from chMultiqcConfig.first()
      set val(prefix), file('mqc/hpv_config.mqc'), file('fastqc/*'), file('trimming/*'), file('ctrl/*'), 
-       file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('mqc/*'), file('mqc/*') from chHpvReport.dump(tag: "mqc") 
+     file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('mqc/*'), file('mqc/*') from chHpvReport.dump(tag: "mqc") 
      file ('software_versions/*') from software_versions_yaml.collect()
      file ('workflow_summary/*') from workflow_summary_yaml.collect()
 
@@ -880,9 +873,11 @@ if (params.splitReport){
      rfilename = customRunName ? "--filename " + customRunName.replaceAll('\\W','_').replaceAll('_+','_') + "_" + prefix + "_multiqc_report" : ''
      metadataOpts = params.metadata ? "--metadata ${metadata}" : ""
      splanOpts = params.samplePlan ? "--splan ${params.samplePlan}" : ""
-     """	
-     mqc_header.py --name "nf-VIF" --version ${workflow.manifest.version} ${metadataOpts} ${splanOpts} > multiqc-config-header.yaml
-     multiqc . -f $rtitle -n ${prefix}_HPVreport.html -c $multiqcConfig -c 'mqc/hpv_config.mqc' -c multiqc-config-header.yaml -m fastqc -m custom_content
+     """
+     awk -F"," -v sname=${prefix} '\$1==sname{print}' ${params.samplePlan} > splan_${prefix}.csv
+     stats2multiqc.sh splan_${prefix}.csv	
+     mqc_header.py --name "${prefix} - nf-VIF" --version ${workflow.manifest.version} ${metadataOpts} ${splanOpts} > multiqc-config-header.yaml
+     multiqc . -f $rtitle -n ${prefix}_nfvif_report.html -c $multiqcConfig -c 'mqc/hpv_config.mqc' -c multiqc-config-header.yaml -m fastqc -m custom_content
      """
    }
 }else{
@@ -921,12 +916,14 @@ if (params.splitReport){
      file('fastqc/*') from fastqcResults.map{items->items[1]}.collect().ifEmpty([])
      file('trimming/*') from trimgaloreResults.map{items->items[1]}.collect().ifEmpty([])
      file ('hpv/*') from hpvGenoStats.map{items->items[1]}.collect()
+     file ('hpv/*') from hpvGenoMqc.map{items->items[1]}.collect()
      file ('hpv/*') from hpvCovStats.map{items->items[1]}.collect()
      file ('hpv/*') from hpvBwCov.map{items->items[1]}.collect()
      file ('hpv/*') from bkpPos.map{items->items[1]}.collect()
-     file ('hpv/*') from mqcGenepos.collect()
-     file ('hpv/*') from ttd.collect().ifEmpty([])
-     file ('ctrl/*') from ctrlStats.collect()
+     file ('hpv/*') from mqcGenepos.map{items->items[1]}.collect()
+     file ('hpv/*') from ttd.map{items->items[1]}.collect().ifEmpty([])
+     file ('hpv/*') from hpvBowtie2Log.map{items->items[1]}.collect().ifEmpty([])
+     file ('ctrl/*') from ctrlStats.map{items->items[1]}.collect()
   
      file ('software_versions/*') from software_versions_yaml.collect()
      file ('workflow_summary/*') from workflow_summary_yaml.collect()
@@ -942,6 +939,7 @@ if (params.splitReport){
      metadataOpts = params.metadata ? "--metadata ${metadata}" : ""
      splanOpts = params.samplePlan ? "--splan ${params.samplePlan}" : ""
      """	
+     stats2multiqc.sh ${params.samplePlan}
      mqc_header.py --name "nf-VIF" --version ${workflow.manifest.version} ${metadataOpts} ${splanOpts} > multiqc-config-header.yaml         
      multiqc . -f $rtitle $rfilename -c $multiqcConfig -c $hpvConfig -c multiqc-config-header.yaml -m fastqc -m custom_content
      """

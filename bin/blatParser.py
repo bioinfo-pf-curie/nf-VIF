@@ -35,7 +35,6 @@ def loadBlat(filename, minProp=0.8):
 
     # Split query name values
     new = data['Qname'].str.split('|', expand=True)
-    print(new)
     data['read'] = new[0]
     data['genotype'] = new[1]
     data['feature'] = new[2]
@@ -208,8 +207,18 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
         merged_both['chr'] + "|"
         + merged_both['chr_position'].astype(str)
     )
-    merged_both['chr_count'] = merged_both.groupby(['Sequence'])['chr_key'].transform('nunique')
-    merged_both = merged_both.drop(columns=['chr_key', 'mkey'])
+    merged_both['chr_pos_count'] = merged_both.groupby(['Sequence'])['chr_key'].transform('nunique')
+
+    ## In case of clustered integration, get range of insertion
+    merged_both['chr_pos_max'] =  merged_both.groupby(['Sequence'])['chr_position'].transform('max')
+    merged_both['chr_pos_min'] = merged_both.groupby(['Sequence'])['chr_position'].transform('min')
+    merged_both['chr_pos_range'] = '[' + merged_both['chr_pos_min'].astype(int).map(str) + '-' + merged_both['chr_pos_max'].astype(int).map(str) + ']'
+    merged_both['end_max'] = merged_both.groupby(['Sequence'])['end'].transform('max')
+    merged_both['end_min'] = merged_both.groupby(['Sequence'])['end'].transform('min') 
+    merged_both['end_range'] = '[' + merged_both['end_min'].astype(int).map(str) + '-' + merged_both['end_max'].astype(int).map(str) + ']'
+
+    merged_both['chr_count'] = merged_both.groupby(['Sequence'])['chr'].transform('nunique')
+    merged_both = merged_both.drop(columns=['chr_key', 'mkey', 'chr_pos_min', 'chr_pos_max', 'end_min', 'end_max'])
 
     ## Match and Score value
     merged_both['match'] = merged_both.groupby(['Sequence'])['match'].transform(max)
@@ -222,11 +231,17 @@ def merged(df_bp_selected, df_hits, hideMultihits=False):
     merged_both.update(Tname)
     
     ## Transform multiHits information to ease table interpretation
-    merged_both['chr'] = np.where(merged_both['chr_count'] == 1, merged_both['chr'], 'multiHits')
-    merged_both['human_orientation'] = np.where(merged_both['chr_count'] == 1, merged_both['human_orientation'],'-')
+    merged_both['chr'] = np.where(merged_both['chr_pos_count'] == 1, merged_both['chr'], 
+                                  np.where(merged_both['chr_count'] == 1, merged_both['chr'], 'multiHits'))
+
+    merged_both['human_orientation'] = np.where(merged_both['chr_pos_count'] == 1, merged_both['human_orientation'],'-')
     merged_both['human_orientation'] = np.where(merged_both['human_orientation'] == 'forward', '--->','<---')
-    merged_both['chr_position'] = np.where(merged_both['chr_count'] == 1, merged_both['chr_position'].astype(int),'-')
-    merged_both['end'] = np.where(merged_both['chr_count'] == 1, merged_both['end'].astype(int),'-')
+
+    merged_both['chr_position'] = np.where(merged_both['chr_pos_count'] == 1, merged_both['chr_position'].astype(int), 
+                                           np.where(merged_both['chr_count'] == 1, merged_both['chr_pos_range'], '-'))
+    merged_both['end'] = np.where(merged_both['chr_pos_count'] == 1, merged_both['end'].astype(int),
+                                  np.where(merged_both['chr_count'] == 1, merged_both['end_range'], '-'))
+
     merged_both = merged_both.rename(columns={"chr":"human_bkp_chr", "chr_position":"human_bkp_pos"})
 
     merged_both.drop_duplicates(inplace=True)
@@ -309,12 +324,12 @@ def addScore(df):
     df.loc[df['uniquely_mapped_key'].isin(one_row_index), 'score'] += 6    
 
     ############
-    ## Set mean score per breakpoint
-    mean_score_by_key = df['score'].groupby(
+    ## Set median score per breakpoint
+    med_score_by_key = df['score'].groupby(
         df['bkp_key']
-    ).mean()
+    ).median()
     df = df.set_index('bkp_key', drop=False)
-    df.update(mean_score_by_key)
+    df.update(med_score_by_key)
 
     # remove keys
     df = df.drop(columns=['left_and_right_key']) 
@@ -368,6 +383,7 @@ if __name__ == "__main__":
         table_to_display = table_to_display.rename(columns={"position": "virus_bkp_pos", "chr":"human_bkp_chr",
                                                             "chr_position":"human_bkp_pos", "end":"human_end",
                                                             "strand":"human_orientation", "virus_strand":"virus_bkp_orientation"})
+
         table_to_display.to_csv(path_or_buf=table, index=False, sep =",", float_format='%.0f')
 
         table_to_display = table_to_display[
@@ -375,6 +391,9 @@ if __name__ == "__main__":
             & (table_to_display['match'] >= 10)
             & (table_to_display['countHQ'] >= 2)
         ]
+        
+        if table_to_display.empty:
+            table_to_display.append(pd.Series([np.nan]), ignore_index=True)
         table_to_display.to_csv(path_or_buf=table_filtered, index=False, sep =",", float_format='%.0f')
 
         ########################################
@@ -408,10 +427,14 @@ if __name__ == "__main__":
             # filter rows to reduce noise
             concat_filtered=concat[(concat['count']>=2) & (concat['countHQ']>=2)]
             concat_filtered=concat_filtered[concat_filtered['human_bkp_chr'] != 'noHits' ]
+
+            ## Add an empty row if no data
+            if concat_filtered.empty:
+                concat_filtered=concat_filtered.append(pd.Series([np.nan]), ignore_index=True)
             concat_filtered.to_csv(path_or_buf=tableBkp_filtered, index=False, sep = ",", float_format='%.0f')
 
     except pd.io.common.EmptyDataError:
-        print >> sys.stderr, "Input files is empty and has been skipped."
+        sys.stderr.write("Input files is empty and has been skipped.")
         emptydf=pd.DataFrame(columns=['genotype', 'feature', 'countHQ', 'count', 'score', 'virus_bkp_pos', 'virus_bkp_orientation',
                                       'human_bkp_chr', 'human_bkp_pos', 'end', 'human_orientation', 'match', 'Flanking_Seq'])
         emptydf.to_csv(path_or_buf=table_filtered,index=False)

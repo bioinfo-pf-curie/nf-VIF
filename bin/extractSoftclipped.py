@@ -71,7 +71,7 @@ def getSoftClippedCoord(read, annot=False):
             if(cigarType != 2 and cigarType != 5):
                 idx += cigarLength
         except:
-            print >> sys.stderr, "Error in CIGAR parsing for read", read.name;
+            sys.stderr.write("Error in CIGAR parsing for read", read.name)
     return (pos, label)
     
 
@@ -83,7 +83,7 @@ def getGenomicBkp(read, excludeBorders=False, reflen=None):
     pos = []
 
     if reflen is None and excludeBorders:
-        print  >> sys.stderr, "Warning: Reference length is not defined. Cannot exclude borders !"
+        sys.stderr.write("Warning: Reference length is not defined. Cannot exclude borders !")
         excludeBorders = False
 
     for (cigarType,cigarLength) in read.cigartuples:
@@ -99,7 +99,7 @@ def getGenomicBkp(read, excludeBorders=False, reflen=None):
             elif(cigarType != 2 and cigarType != 5):
                 idx += cigarLength
         except:
-            print >> sys.stderr, "Error in CIGAR parsing for read", read.name;
+            sys.stderr.write("Error in CIGAR parsing for read", read.name)
     if len(pos) > 0:
         return pos
     else:
@@ -134,22 +134,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.bed is True and args.mqc is True:
-        print "--bed and --mqc parameters cannot be used together. Please specify only one coverage format"
+        print("--bed and --mqc parameters cannot be used together. Please specify only one coverage format")
         sys.exit(1)
     
     # Verbose mode
     if args.verbose:
-        print "## extractSoftClipped.py"
-        print "## BAM input=", args.filename
-        print "## minLen=", args.minLen
-        print "## outputDir=", args.outputDir
+        print("## extractSoftClipped.py")
+        print("## BAM input=", args.filename)
+        print("## minLen=", args.minLen)
+        print("## outputDir=", args.outputDir)
 
     baseReadsFile = os.path.basename(args.filename)
     baseReadsFile = re.sub(r'\.bam$|\.sam$', '', baseReadsFile)
     ReadsFileforgenotype = re.sub(r'\.bam$|\.sam$|\.R', '', baseReadsFile)
-    print '## base reads file=', baseReadsFile
+    print('## base reads file=', baseReadsFile)
     genotype = re.search(r'^\w+-(.*)$', ReadsFileforgenotype, re.M)
-    print '## genotype=', genotype.group(1)
+    print('## genotype=', genotype.group(1))
     cur_geno = genotype.group(1)
 
     # Open handlers for output files
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
      # Read the SAM/BAM file
     if args.verbose:
-        print "## Opening SAM/BAM file '", args.filename, "'..."
+        print("## Opening SAM/BAM file '", args.filename, "'...")
     samfile = pysam.Samfile(args.filename, "rb")
 
     # Reads are 0-based too (for both SAM and BAM format)
@@ -272,7 +272,7 @@ if __name__ == "__main__":
                                 bkpPos[label][read.reference_name][coord] = 1
     
         if (readsCounter % 100000 == 0 and args.verbose):
-           print "##", readsCounter
+           print("##", readsCounter)
    
     ## Export BED file of breakpoints position
     if args.bed or args.mqc:

@@ -1,22 +1,30 @@
-***********************************
-## CHANGES IN VERSION 1.1.0
-
-TODO:
-- Test insertion multiple - in silico ?
-- Test mapQ20 ?
-- Test ref hpv simplifié ?
-- Extraire les séquences de genes et faire un variant calling dessus ?
-- Jonction HPV/hpv
-- mqc report
-
+**********************************
+## CHANGES IN VERSION 1.1.1
 
 NEW FEATURES
-   
-   o New --minMapq option to provide the minimum mapping quality for the mapping steps
+
+   o First test to infer the type of sample, EPI/INTEGRATED/NEG
+
+   o Add General Metrics table with additional info
+
+   o Move to Python3
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+   o Display insertion site table even if no breakpoint is detected
+
+   o Remove non useful Fastqc plots
+
+**********************************
+## CHANGES IN VERSION 1.1.0
+
+NEW FEATURES
+
+   o New --minMapq option to provide the minimum mapping quality for the end-to-end mapping steps
 
    o New --minLen option to provide the minimum length of clipped sequence to consider
 
-   o Update of BLAT summary with flanking info
+   o Update of BLAT summary with flanking sequence info
    
    o Manage overlapping R1/R2 reads reporting the same breakpoint
 
