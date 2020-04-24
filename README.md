@@ -20,12 +20,12 @@ This pipeline was designed to process Illumina sequencing data from the HPV capt
 Briefly, it allows to detect and genotype the HPV strain(s) available in the samples, and to precisely map the insertion sites on the Human genome.
 
 1. Reads cleaning and qality controls ([TrimGalore!](https://github.com/FelixKrueger/TrimGalore), [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. HPV Genotyping (([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml)))
-2. Local alignment on detected HPV strain(s) ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
-3. Detection of putative HPV breakpoints using soft-clipped reads
-4. Soft-clipped reads alignment on Human genome reference ([BLAT](https://genome.ucsc.edu/FAQ/FAQblat.html))
-5. Detection of insertion loci and filtering of the results
-6. Presentation of results in a dynamic report ([MultiQC](http://multiqc.info/))
+2. HPV Genotyping ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
+3. Local alignment on detected HPV strain(s) ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
+4. Detection of putative HPV breakpoints using soft-clipped reads
+5. Soft-clipped reads alignment on Human genome reference ([BLAT](https://genome.ucsc.edu/FAQ/FAQblat.html))
+6. Detection of insertion loci and filtering of the results
+7. Presentation of results in a dynamic report ([MultiQC](http://multiqc.info/))
 
 ### Quick help
 
