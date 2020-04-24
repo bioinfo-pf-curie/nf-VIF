@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Author(s): Nicolas Servant
+# Author(s): Nicolas Servant and Tina Alaeitabar
 # Contact: nicolas.servant@curie.fr
 
 # Copyright Institut Curie 2019
@@ -18,6 +18,7 @@ import sys
 import os
 import re
 import pysam
+import pandas as pd
 
 def isHardClipped(read):
     """Check if a read is hard-clipped"""
@@ -32,8 +33,15 @@ def isSoftClipped(read):
     pattern = re.compile('(\w+)S')
     if pattern.match(read.cigarstring):
         return True
+        
     else:
         return False
+
+def ReverseComplement(Pattern):
+    """Reverse Complement of a sequence"""
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
+    reverse_complement = "".join(complement.get(base, base) for base in reversed(Pattern))
+    return reverse_complement
 
 
 def getSoftClippedCoord(read, annot=False):
@@ -63,8 +71,7 @@ def getSoftClippedCoord(read, annot=False):
             if(cigarType != 2 and cigarType != 5):
                 idx += cigarLength
         except:
-            print >> sys.stderr, "Error in CIGAR parsing for read", read.name;
-
+            sys.stderr.write("Error in CIGAR parsing for read", read.name)
     return (pos, label)
     
 
@@ -76,7 +83,7 @@ def getGenomicBkp(read, excludeBorders=False, reflen=None):
     pos = []
 
     if reflen is None and excludeBorders:
-        print  >> sys.stderr, "Warning: Reference length is not defined. Cannot exclude borders !"
+        sys.stderr.write("Warning: Reference length is not defined. Cannot exclude borders !")
         excludeBorders = False
 
     for (cigarType,cigarLength) in read.cigartuples:
@@ -92,7 +99,7 @@ def getGenomicBkp(read, excludeBorders=False, reflen=None):
             elif(cigarType != 2 and cigarType != 5):
                 idx += cigarLength
         except:
-            print >> sys.stderr, "Error in CIGAR parsing for read", read.name;
+            sys.stderr.write("Error in CIGAR parsing for read", read.name)
     if len(pos) > 0:
         return pos
     else:
@@ -116,37 +123,40 @@ def getClippedSeq(read, coords, revert=False):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("filename")
     parser.add_argument("-l", "--minLen", help="Minimum length of trimmed sequence", default=0)
-    parser.add_argument("-b", "--bed", help="Export soft-clipped borders in BED format", action='store_true')
-    parser.add_argument("-m", "--mqc", help="Export soft-clipped borders in MultiQC format", action='store_true')
+    parser.add_argument("-b", "--bed", help="Export soft-clipped borders coverage in BEDGraph format", action='store_true')
+    parser.add_argument("-m", "--mqc", help="Export soft-clipped borders coverage in MultiQC format", action='store_true')
     parser.add_argument("-s", "--stranded", help="Annotate 3' and 5' trimmed sequences and report them in distinct output files", action='store_true')
     parser.add_argument("-v", "--verbose", help="Verbose mode", action='store_true')
     parser.add_argument("-o", "--outputDir", help="Output directory", default="./")
     args = parser.parse_args()
 
     if args.bed is True and args.mqc is True:
-        print "--bed and --mqc parameters cannot be used together. Please specify only one output format"
+        print("--bed and --mqc parameters cannot be used together. Please specify only one coverage format")
         sys.exit(1)
     
     # Verbose mode
     if args.verbose:
-        print "## extractSoftClipped.py"
-        print "## BAM input=", args.filename
-        print "## minLen=", args.minLen
-        print "## outputDir=", args.outputDir
+        print("## extractSoftClipped.py")
+        print("## BAM input=", args.filename)
+        print("## minLen=", args.minLen)
+        print("## outputDir=", args.outputDir)
 
     baseReadsFile = os.path.basename(args.filename)
     baseReadsFile = re.sub(r'\.bam$|\.sam$', '', baseReadsFile)
-    print '## base reads file=', baseReadsFile
-    genotype = re.search(r'^\w+-(.*)$', baseReadsFile, re.M)
-    print '## genotype=', genotype.group(1)
+    ReadsFileforgenotype = re.sub(r'\.bam$|\.sam$|\.R', '', baseReadsFile)
+    print('## base reads file=', baseReadsFile)
+    genotype = re.search(r'^\w+-(.*)$', ReadsFileforgenotype, re.M)
+    print('## genotype=', genotype.group(1))
     cur_geno = genotype.group(1)
- 
+
     # Open handlers for output files
     faHandler = open(args.outputDir + '/' + baseReadsFile + '.fa', 'w')
+    bkpHandler = open(args.outputDir + '/' + baseReadsFile + '_bkp.csv', 'w')
+    bkpHandler.write("Read_Name" + "\t" + "Sequence" + "\t" + "Pos_Ref" + "\t" + "CigarString" + "\t" + "Label" + "\t" + "SoftClip_Position" + "\t" + "BreakPoint_Position" + "\t" +  "Breakpoint" + "\t" + "Coordinate_Fasta" +"\t" + "Length_Seq" + "\t" + "Flanking_Seq" + "\n")
+
     if args.bed:
         if args.stranded:
             outHandler3 = open(args.outputDir + '/' + baseReadsFile + '_3prime_bkp.bed', 'w')
@@ -159,28 +169,72 @@ if __name__ == "__main__":
             outHandler5 = open(args.outputDir + '/' + baseReadsFile + '_5prime_bkp.mqc', 'w')
         else:
             outHandler = open(args.outputDir + '/' + baseReadsFile + '_bkp.mqc', 'w')
-    
-    # Read the SAM/BAM file
+
+
+     # Read the SAM/BAM file
     if args.verbose:
-        print "## Opening SAM/BAM file '", args.filename, "'..."
+        print("## Opening SAM/BAM file '", args.filename, "'...")
     samfile = pysam.Samfile(args.filename, "rb")
 
     # Reads are 0-based too (for both SAM and BAM format)
     # Loop on all reads
     readsCounter=0
     bkpPos = {}
-
+ 
     for read in samfile.fetch(until_eof=True):
         readsCounter =+ 1
 
         ## /!\ Note that here, we do not take care of read pairs
         if isSoftClipped(read):
-        
             (clippedCoord, clippedAnnot) = getSoftClippedCoord(read, annot=args.stranded)
             clippedSeq = getClippedSeq(read, clippedCoord)
-            coordRef = getGenomicBkp(read, excludeBorders=True, reflen=samfile.get_reference_length(samfile.get_reference_name(read.tid)))
 
-            ## Export clipped reads that pass the filters in fasta format
+            ## Export in csv format 
+            for i in range(len(clippedCoord)):
+                s = clippedCoord[i]
+                label = clippedAnnot[i]
+                cseq = clippedSeq[i]
+
+                if len(cseq) > int(args.minLen):
+                    if label == '3prime' and args.stranded:
+                        bkpStart = clippedCoord[i][0]+1
+                    elif label == '5prime' and args.stranded:
+                        bkpStart = clippedCoord[i][1]+1
+                    else:
+                        if clippedCoord[i][0]==0:
+                            bkpStart = clippedCoord[i][1]+1
+                        else:
+                            bkpStart = clippedCoord[i][0]+1
+
+                    ## Get bkp motif
+                    mStart =  bkpStart - (int(args.minLen) + 1)
+                    mEnd = bkpStart + (int(args.minLen) - 1)
+                    #mStart = bkpStart - 21
+                    #mEnd = bkpStart + 19
+                    if mStart < 0:
+                        mStart = 0
+                    if mEnd >= len(read.seq):
+                        mEnd = len(read.seq)
+                    pos=[(mStart,mEnd)] ## 40 pb
+                    bkpMotif = getClippedSeq(read, pos)
+                    #if len(bkpMotif) > 0 and pos[0][1] < len(read.seq):
+                    #    if len(bkpMotif[0]) > 0 :
+                    #clippedSeq = getClippedSeq(read, [s])
+                    if label == '5prime' and args.stranded:
+                        RevCom = ReverseComplement(bkpMotif[0])
+                        RevComSeq = ReverseComplement(cseq)
+                        bkpHandler.write(read.query_name+ "\t" + RevCom + "\t" + str(read.reference_start+1) 
+                                         + "\t" +read.cigarstring + "\t" + label + "\t" + str(s) + "\t" 
+                                         + str(pos[0]) + "\t" + str(s[1])+ "\t" + str(s) + "\t" + str(s[1]) 
+                                         + "\t" + RevComSeq + " \n")
+                    elif (label == '3prime' and args.stranded) or not args.stranded:
+                        bkpHandler.write(read.query_name+ "\t" + bkpMotif[0] +  "\t" + str(read.reference_end) 
+                                         + "\t" + read.cigarstring + "\t" + label + "\t" + str(s) + "\t" 
+                                         + str(pos[0]) + "\t" + str(s[0]) + "\t" + str(((s[0]),(len(read.seq)))) + "\t" 
+                                         + str(len(read.seq)-s[0]) + "\t" + cseq + "\n")
+
+            ## Export in fasta format
+            ##clippedSeq = getClippedSeq(read, clippedCoord) 
             for i in range(len(clippedSeq)):
                 s = clippedSeq[i]
                 label = clippedAnnot[i]
@@ -195,8 +249,9 @@ if __name__ == "__main__":
                         faHandler.write(">" + read.query_name + "\n")
                         faHandler.write(s + "\n")
 
-            ## Count the breakpoints frequency of clipped reads that pass the filters
-            if args.bed or args.mqc:            
+
+            coordRef = getGenomicBkp(read, excludeBorders=True, reflen=samfile.get_reference_length(samfile.get_reference_name(read.tid)))
+            if args.bed or args.mqc:
                 if coordRef is not None:
                     for i in range(len(coordRef)):
                         coord = coordRef[i]
@@ -217,8 +272,8 @@ if __name__ == "__main__":
                                 bkpPos[label][read.reference_name][coord] = 1
     
         if (readsCounter % 100000 == 0 and args.verbose):
-            print "##", readsCounter
-            
+           print("##", readsCounter)
+   
     ## Export BED file of breakpoints position
     if args.bed or args.mqc:
         for lab in bkpPos:
@@ -240,9 +295,10 @@ if __name__ == "__main__":
                             outHandler.write(str(pos) + "\t" + str(bkpPos[chr][pos]) + "\n")
     
     # Close handler
+    bkpHandler.close()
     samfile.close()
     faHandler.close()
-
+ 
     if args.bed or args.mqc:
         if args.stranded:
             outHandler3.close()

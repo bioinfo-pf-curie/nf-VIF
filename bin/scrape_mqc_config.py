@@ -27,14 +27,14 @@ if __name__ == "__main__":
     hpv_cov_{genotype}:
       file_format: 'tsv'
       section_name: '[{genotype}] - Coverage'
-      description: 'from HPV local aligment.'
+      description: 'from HPV local aligment. The coverage is calculated as the number of reads per bin, where bins are short consecutive counting windows of 50bp.'
       plot_type: 'linegraph'
       pconfig:
          namespace: 'hpvcov_{genotype}'
          title: '[{genotype}] Alignment Coverage'
          id: 'hpvcov_{genotype}'
          xlab: '{genotype} genomic sequence'
-         ylab: 'Normalized Reads Coverage (CPM)'
+         ylab: 'Reads Coverage'
     '''
 
     config_bkp='''\
