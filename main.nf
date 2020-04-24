@@ -859,7 +859,7 @@ if (params.splitReport){
      file splan from chSplan.first()
      file multiqcConfig from chMultiqcConfig.first()
      set val(prefix), file('mqc/hpv_config.mqc'), file('fastqc/*'), file('trimming/*'), file('ctrl/*'), 
-     file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('mqc/*'), file('mqc/*') from chHpvReport.dump(tag: "mqc") 
+     file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*'), file('hpv/*') from chHpvReport.dump(tag: "mqc") 
      file ('software_versions/*') from software_versions_yaml.collect()
      file ('workflow_summary/*') from workflow_summary_yaml.collect()
 

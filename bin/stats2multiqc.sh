@@ -36,9 +36,12 @@ do
     geno=$(cut -d, -f2 hpv/${sample}_HPVgenotyping.filtered | tr '\n' '|' | sed -e 's/|$//')
     
     ##n_breakpoints
-    n_hq_bkp=0
-    for bkpFile in $(find mqc/ -name "${sample}*" -name '*bkptable_filtered.csv')
+    n_hq_bkp=-1
+    for bkpFile in $(find hpv/ -name "${sample}*" -name '*bkptable_filtered.csv')
     do
+	if [[ $n_hq_bkp == -1 ]];then
+	    n_hq_bkp=0
+	fi
 	genotype=$(basename $bkpFile | sed -e 's/'${sample}'-//' -e 's/_bkptable_filtered.csv//')
 	#nb_geno=$(awk -F"\t" -v geno=${genotype} '$1==geno{print $2}' hpv/${sample}_HPVgenotyping.stats)
 	nb_geno=$(awk -F',' -v geno=${genotype} '$3==geno{print $4}' hpv/${sample}-${genotype}_coverage.stats)
@@ -49,7 +52,9 @@ do
     done
     
     ##status
-    if [[ $(echo "${p_unique_hpv} >= 1" |bc -l) == 1 && $(echo "${n_hq_bkp} >= 1" |bc -l) == 1 ]];then
+    if [[ ${n_hq_bkp} == -1 ]]; then
+	status="UNKNOWN"
+    elif [[ $(echo "${p_unique_hpv} >= 1" |bc -l) == 1 && $(echo "${n_hq_bkp} >= 1" |bc -l) == 1 ]];then
 	status="INTEGRATED"
     elif [[ $(echo "${p_unique_hpv} >= 1" |bc -l) == 1 ]]; then
 	status="EPI"
