@@ -32,7 +32,7 @@ Briefly, it allows to detect and genotype the HPV strain(s) available in the sam
 ```bash
 N E X T F L O W  ~  version 19.04.0
 Launching `main.nf` [backstabbing_roentgen] - revision: 93bf83bb3b
-HPV v1.0dev
+HPV v1.1.1dev
 =======================================================
 
 Usage:
@@ -57,20 +57,37 @@ Genome References:              If not specified in the configuration file or yo
   --blatdb                      Path to BLAT database (.2bit)
 
 HPV References:
-  --fasta_hpv                   Path to Fasta HPV reference (.fasta)
-  --bwt2_index_hpv              Path to Bowtie2 index for all HPV strains
-  --bwt2_index_hpv_split        Path to Bowtie2 index per HPV strain
+  --fastaHpv                    Path to Fasta HPV reference (.fasta)
+  --bwt2IndexHpv                Path to Bowtie2 index for all HPV strains
+  --bwt2IndexHpvSplit           Path to Bowtie2 index per HPV strain
+  --saveReference               Save all references generated during the analysis. Default: False
 
+Advanced options:
+  --minMapq                     Minimum reads mapping quality. Default: 0
+  --minLen                      Minimum trimmed length sequence to consider. Default: 15
+  --minFreqGeno                 Fraction of reads to consider a genotpye. Default: 0.2
+  --nbGeno                      Number of HPV genotype to consider
+  --splitReport                 Generate one report per sample
+ 
 Other options:
-  --nb_geno                     Number of HPV genotype to consider. Default: 3
-  --split_report                Generate one report per sample
-  --skip_trimming               Skip trimming step
-  --skip_fastqc                 Skip quality controls on sequencing reads
-  --skip_blat                   Skip Human mapping with Blat
-  --skip_multiqc                Skip report
   --outdir                      The output directory where the results will be saved
   --email                       Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits
   -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
+
+Skip options:
+  --skipTrimming               Skip trimming step
+  --skipFastqc                 Skip quality controls on sequencing reads
+  --skipBlat                   Skip Human mapping with Blat
+  --skipMultiqc                Skip report
+
+=======================================================
+Available Profiles
+  -profile test                Set up the test dataset
+  -profile conda               Build a new conda environment before running the pipeline
+  -profile toolsPath           Use the paths defined in configuration for each tool
+  -profile singularity         Use the Singularity images for each process
+  -profile cluster             Run the workflow on the cluster, instead of locally
+
 ```
 
 ### Quick run
