@@ -466,8 +466,9 @@ process ctrlMapping {
   tag "$prefix"
   publishDir "${params.outdir}/ctrlMapping/", mode: 'copy',
       saveAs: {filename ->
-          if (filename.indexOf(".bam") == -1) "logs/$filename"
-          else filename}
+          if (filename.endsWith(".log")) "logs/$filename"
+          else if (params.saveAlignedIntermediates) filename}
+	  else null
 
   input:
   set val(prefix), file(reads) from readsCtrl
@@ -505,6 +506,7 @@ process ctrlStats {
   set val(prefix), file(bam) from ctrlBam
 
   output:
+  set val(prefix), file('*fsorted_ctrl.{bam,bam.bai}') into ctrlFiltBams
   set val(prefix), file("*ctrl.stats") into ctrlStats
 
   script:
@@ -528,8 +530,9 @@ process HPVmapping {
   tag "$prefix"
   publishDir "${params.outdir}/hpvMapping/allref", mode: 'copy',
         saveAs: {filename ->
-            if (filename.indexOf(".bam") == -1) "logs/$filename"
-            else filename}
+            if (filename.endsWith(".log")) "logs/$filename"
+            else if (params.saveAlignedIntermediates) filename
+	    else null}
 
   input:
   set val(prefix), file(reads) from readsHpvmap
@@ -569,6 +572,7 @@ process selectGenotypes{
   set val(prefix), file("${prefix}_HPVgenotyping.stats") into hpvGenoStats
   set val(prefix), file("${prefix}_HPVgenotyping.filtered") into hpvGenoMqc
   file("${prefix}_HPVgenotyping.filtered") into selHpvGeno
+  set val(prefix), file('*fsorted_hpvs.{bam,bam.bai}') into hpvsFiltBams
 
   script:
   """
@@ -610,8 +614,9 @@ selHpvGeno
 process HPVlocalMapping {
   publishDir "${params.outdir}/hpvMapping/pergenotype", mode: 'copy',
       saveAs: {filename ->
-          if (filename.indexOf(".bam") == -1) "logs/$filename"
-          else filename}
+          if (filename.endsWith(".log")) "logs/$filename"
+	  else if (params.saveAlignedIntermediates) filename
+          else null}
 
   input:
   file index from bwt2IndexHpvSplit.first()
@@ -675,10 +680,11 @@ process HPVcoverage {
 
   output:
   set val(prefix), file("*covmatrix.mqc") into hpvBwCov
+  set val(prefix), file('*sorted.{bam,bam.bai}') into hpvSortedBams
 
   script:
   pfix= bam.toString() - ~/(_sorted)?(.bam)?$/
-  normOpts = params.splitReport ? "--normalizeUsing CPM" : ""
+  normOpts = params.splitReport ? "" : "--normalizeUsing CPM"
   """
   samtools sort -@ ${task.cpus} -o ${pfix}_sorted.bam ${bam}
   samtools index ${pfix}_sorted.bam
