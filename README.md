@@ -3,7 +3,7 @@
 **Institut Curie - Bioinformatics Core Facility**
 
 [![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A50.32.0-brightgreen.svg)](https://www.nextflow.io/)
-[![MultiQC](https://img.shields.io/badge/MultiQC-1.6-blue.svg)](https://multiqc.info/)
+[![MultiQC](https://img.shields.io/badge/MultiQC-1.8-blue.svg)](https://multiqc.info/)
 [![Install with](https://anaconda.org/anaconda/conda-build/badges/installer/conda.svg)](https://conda.anaconda.org/anaconda)
 [![Singularity Container available](https://img.shields.io/badge/singularity-available-7E4C74.svg)](https://singularity.lbl.gov/)
 
@@ -20,19 +20,19 @@ This pipeline was designed to process Illumina sequencing data from the HPV capt
 Briefly, it allows to detect and genotype the HPV strain(s) available in the samples, and to precisely map the insertion sites on the Human genome.
 
 1. Reads cleaning and qality controls ([TrimGalore!](https://github.com/FelixKrueger/TrimGalore), [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. HPV Genotyping (([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml)))
-2. Local alignment on detected HPV strain(s) ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
-3. Detection of putative HPV breakpoints using soft-clipped reads
-4. Soft-clipped reads alignment on Human genome reference ([BLAT](https://genome.ucsc.edu/FAQ/FAQblat.html))
-5. Detection of insertion loci and filtering of the results
-6. Presentation of results in a dynamic report ([MultiQC](http://multiqc.info/))
+2. HPV Genotyping ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
+3. Local alignment on detected HPV strain(s) ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
+4. Detection of putative HPV breakpoints using soft-clipped reads
+5. Soft-clipped reads alignment on Human genome reference ([BLAT](https://genome.ucsc.edu/FAQ/FAQblat.html))
+6. Detection of insertion loci and filtering of the results
+7. Presentation of results in a dynamic report ([MultiQC](http://multiqc.info/))
 
 ### Quick help
 
 ```bash
 N E X T F L O W  ~  version 19.04.0
 Launching `main.nf` [backstabbing_roentgen] - revision: 93bf83bb3b
-HPV v1.0dev
+HPV v1.1.1dev
 =======================================================
 
 Usage:
@@ -57,20 +57,36 @@ Genome References:              If not specified in the configuration file or yo
   --blatdb                      Path to BLAT database (.2bit)
 
 HPV References:
-  --fasta_hpv                   Path to Fasta HPV reference (.fasta)
-  --bwt2_index_hpv              Path to Bowtie2 index for all HPV strains
-  --bwt2_index_hpv_split        Path to Bowtie2 index per HPV strain
+  --fastaHpv                    Path to Fasta HPV reference (.fasta)
+  --bwt2IndexHpv                Path to Bowtie2 index for all HPV strains
+  --bwt2IndexHpvSplit           Path to Bowtie2 index per HPV strain
+  --saveReference               Save all references generated during the analysis. Default: False
 
+Advanced options:
+  --minMapq                     Minimum reads mapping quality. Default: 0
+  --minLen                      Minimum trimmed length sequence to consider. Default: 15
+  --minFreqGeno                 Fraction of reads to consider a genotpye. Default: 0.1
+  --splitReport                 Generate one report per sample. Default: false
+ 
 Other options:
-  --nb_geno                     Number of HPV genotype to consider. Default: 3
-  --split_report                Generate one report per sample
-  --skip_trimming               Skip trimming step
-  --skip_fastqc                 Skip quality controls on sequencing reads
-  --skip_blat                   Skip Human mapping with Blat
-  --skip_multiqc                Skip report
   --outdir                      The output directory where the results will be saved
   --email                       Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits
   -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
+
+Skip options:
+  --skipTrimming               Skip trimming step
+  --skipFastqc                 Skip quality controls on sequencing reads
+  --skipBlat                   Skip Human mapping with Blat
+  --skipMultiqc                Skip report
+
+=======================================================
+Available Profiles
+  -profile test                Set up the test dataset
+  -profile conda               Build a new conda environment before running the pipeline
+  -profile toolsPath           Use the paths defined in configuration for each tool
+  -profile singularity         Use the Singularity images for each process
+  -profile cluster             Run the workflow on the cluster, instead of locally
+
 ```
 
 ### Quick run
@@ -96,7 +112,7 @@ nextflow run main.nf --samplePlan MY_SAMPLE_PLAN --genome 'hg19' --outdir MY_OUT
 #### Run the pipeline on a cluster
 
 ```
-echo "nextflow run main.nf --reads '*.R{1,2}.fastq.gz' --genome 'hg19' --outdir MY_OUTPUT_DIR -profile singularityPath,cluster" | qsub -N illumina-hpv
+echo "nextflow run main.nf --reads '*.R{1,2}.fastq.gz' --genome 'hg19' --outdir MY_OUTPUT_DIR -profile singularity,cluster" | qsub -N illumina-hpv
 
 ```
 

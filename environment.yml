@@ -11,9 +11,9 @@ dependencies:
   - samtools=1.9
   - bedtools=2.28.0
   - deeptools=3.3.0
-  - pyfaidx=0.5.5.2
-  - python=2.7.15
-  - pysam=0.15.2
-  - multiqc=1.7
+  - python=3.6
+  - pyfaidx=0.5.8
+  - pysam=0.15.3
+  - pandas=1.0.3
+  - multiqc=1.8
   - blat=35
-  - pandas=0.24.2

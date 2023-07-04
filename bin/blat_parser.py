@@ -96,11 +96,10 @@ try:
     )
     ends_by_key = data_filtered_renamed['end'].groupby(
         data_filtered_renamed['ends_key']
-    ).median()
+    ).max()
     #.apply(lambda x: "{%s}" % ','.join(np.unique(x)))
     data_filtered_renamed = data_filtered_renamed.set_index('ends_key')
     data_filtered_renamed.update(ends_by_key)
-
 
     cleaned = data_filtered_renamed
     cleaned['score'] = 0
@@ -195,11 +194,11 @@ try:
     table_to_display.to_csv(table, index=False, float_format='%.0f')
 
     # filter table to reduce noise
-    table_to_display = table_to_display[
-        (table_to_display['score'] >= 4)
-        & (table_to_display['match'] >= 10)
-        & (table_to_display['counts'] >= 2)
-    ]    
+    #table_to_display = table_to_display[
+    #    (table_to_display['score'] >= 4)
+    #    & (table_to_display['match'] >= 10)
+    #    & (table_to_display['counts'] >= 2)
+    #]    
 
     table_to_display.sort_values(by=['score', 'counts'], ascending=False, inplace=True)
 
