@@ -434,6 +434,7 @@ if (!params.skipTrimming){
    trimgaloreResults = Channel.from(false)
 }
 
+
 /*
  * FastQC
  */
@@ -880,7 +881,7 @@ if (params.splitReport){
      metadataOpts = params.metadata ? "--metadata ${metadata}" : ""
      splanOpts = params.samplePlan ? "--splan ${params.samplePlan}" : ""
      """
-     awk -F"," -v sname=${prefix} '\$1==sname{print}' ${params.samplePlan} > splan_${prefix}.csv
+     awk -F"," -v sname=${prefix} '\$1==sname{print}' ${splan} > splan_${prefix}.csv
      stats2multiqc.sh splan_${prefix}.csv	
      mqc_header.py --name "${prefix} - nf-VIF" --version ${workflow.manifest.version} ${metadataOpts} ${splanOpts} > multiqc-config-header.yaml
      multiqc . -f $rtitle -n ${prefix}_nfvif_report.html -c $multiqcConfig -c 'mqc/hpv_config.mqc' -c multiqc-config-header.yaml -m fastqc -m custom_content
@@ -945,7 +946,7 @@ if (params.splitReport){
      metadataOpts = params.metadata ? "--metadata ${metadata}" : ""
      splanOpts = params.samplePlan ? "--splan ${params.samplePlan}" : ""
      """	
-     stats2multiqc.sh ${params.samplePlan}
+     stats2multiqc.sh ${splan}
      mqc_header.py --name "nf-VIF" --version ${workflow.manifest.version} ${metadataOpts} ${splanOpts} > multiqc-config-header.yaml         
      multiqc . -f $rtitle $rfilename -c $multiqcConfig -c $hpvConfig -c multiqc-config-header.yaml -m fastqc -m custom_content
      """
