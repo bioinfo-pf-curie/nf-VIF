@@ -19,7 +19,9 @@ The current workflow is based on the nf-core best practice. See the nf-core proj
 This pipeline was designed to process Illumina sequencing data from the HPV capture protocol.
 Briefly, it allows to detect and genotype the HPV strain(s) available in the samples, and to precisely map the insertion sites on the Human genome.
 
-1. Reads cleaning and qality controls ([TrimGalore!](https://github.com/FelixKrueger/TrimGalore), [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
+![workflow](docs/images/VIF-workflow.png)
+
+1. Reads cleaning and quality controls ([TrimGalore!](https://github.com/FelixKrueger/TrimGalore), [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
 2. HPV Genotyping ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
 3. Local alignment on detected HPV strain(s) ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml))
 4. Detection of putative HPV breakpoints using soft-clipped reads

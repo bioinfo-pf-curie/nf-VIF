@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ue
+
 hpvlist=$1
 hpvgenes=$2
 prefix=$3

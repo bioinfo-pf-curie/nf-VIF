@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ue
+
 splan=$1
 
 ## Catch sample names
